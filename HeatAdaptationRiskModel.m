@@ -1,9 +1,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%   HEAT-HARM model (Heat - Adaptation - Risk - Model)
+%   HARM model (Heat - Adaptation - Risk - Model)
 %
-%   Estimates heat related mortality and reduction in
+%   Estimates heat related mortality, residential discomfort and reduction in
 %   labour productivity under future projections of climate change.
-%   TO ADD: Residential dicomfort
 %
 %   Updated from ARCADIA Impacts model developed in ARCADIA project (ECI, University of Oxford)
 %   for OpenCLIM project (Tyndall Centre for Climate Change Research, UEA).
@@ -11,7 +10,7 @@
 %   Uses post-processed UKCP18 data provided from HEAT model (Alan Kennedy-Asser, University of Bristol)
 %
 %   Author: Katie Jenkins    UEA
-%   Date:06/06/2022 [version_04]
+%   Date:12/01/2023 [version_05]
 %   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -101,7 +100,7 @@ tic %stopwatch to measure performance
 format short e
 dbstop if error %debug if error
 
-load('heat_impact_data') %contains all the .m input data required.
+load('heat_impact_data') %contains all the 15.m input data required.
 
 %Parameters
 socioEcScen = 2; % Socioeconomic scenario options: (Climate change only, Climate change and socio-economic change)
@@ -113,19 +112,29 @@ nClimScen = 0; %number of climate scenarios - based on input data.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 BiasCorrected = 1; %TRUE = 1, FALSE = 0 %%USER DEFINED AT THIS STAGE IN FUTURE ALWAYS USE BIAS CORRECTED??
 impactMetric = 1; %Select impact to run - 1 = mortality; 2 = labour productivity; 3 = residential discomfort.
-acclimaScen = 2; %Select approach to behavioural adaptation via natural acclimatisation. 1 = No Adaptation; 2 & 3 = pre-defined thresholds 1 and 2 degrees respectively; 4 = 93rd P of TMean (spatially and temporally explicit based on output from HEAT)
 ClimateScenario = 6; %1 = past; 2 = 1.5 degree; 3 = 2.0 degree; 4 = 3.0 degree; 5 = 4.0 degree; 6 = run ALL.
 populationYearbaseline = 2011;
-populationYear15degree = 2020; % 2020, 2050, 2100; population year defines when warming level projected to occur.
-populationYear2degree = 2030; % 2030; 2050; 2100; population year defines when warming level projected to occur.
-populationYear3degree = 2050; % 2100; population year defines when warming level projected to occur.
-populationYear4degree = 2100;
-UK_SSP = 5; %Default is UK SSP5 at moment - update when data available from UDM for UK-SSPs 1-5.
+populationYear15degree = 2020; % 2020, 2050, 2080; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
+populationYear2degree = 2030; % 2030; 2050; 2080; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
+populationYear3degree = 2050; % 2050; 2080; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
+populationYear4degree = 2100; % NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
+UK_SSP = 5; %data available from UDM for UK-SSPs 2,4 and 5.
+
+%Mortality Related
+acclimaScen = 1; %Select approach to behavioural adaptation via natural acclimatisation. 1 = No Adaptation; 2 & 3 = pre-defined thresholds 1 and 2 degrees respectively; 4 = 93rd P of TMean (spatially and temporally explicit based on output from HEAT)
+
+% Residential discomfort related
+RDProbabilityLevel = 0.25; % Level at which to define probability of residential thermal discomfort. [See Kingsborough et al: http://dx.doi.org/10.1016/j.crm.2017.01.001. Set values as 0.1, 0.25 and 0.5.
+RDNumberConsecutiveDays = 5; % number of consecutive days of overheating above which overheating is calculated.
+RDAdaptScenario = 2; % 1 = standard whole house retrofit; 2 = option 1 plus external shutters for shading; 3 = air conditioning uptake only.
+
+%labour productivity related
+acclimatised = 1; % 0 = non-acclimatised; 1= acclimatised. Defines which Exposure response Functions (ERFs) are used.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%
-% Add something to give files more readable names...
+% Add something to give files more readable names...Mortality
 if acclimaScen == 1
     adaptationName = 'No Adaptation';
 elseif acclimaScen == 2
@@ -136,23 +145,44 @@ elseif acclimaScen == 4
     adaptationName = 'Adapt 93rd Percentile';
 end
 
-%%
-% Select correct SSP dataset - update when data comes from UDM.
+% Add something to give files more readable names...Residential discomfort
+if RDAdaptScenario == 1
+    adaptationIntervention = 'Retro';
+elseif RDAdaptScenario == 2
+    adaptationIntervention = 'Retro_shading';
+elseif RDAdaptScenario == 3
+    adaptationIntervention = 'a/c';
+end
+
+%% Select correct SSP dataset. OFFLINE AT
+% MOMENT - IN FUTURE PULL FROM .asc FILES ON DAFNI first then aggregate.
+population_aggregate = zeros(5,5);
+
 if UK_SSP == 1
     population = population_SSP1;
-    population_aggregate = population_aggregate_SSP1;
+    for i=1:5
+        population_aggregate(:,i) = sum(population{i}(:,3:7),[]); 
+    end
 elseif UK_SSP == 2
     population = population_SSP2;
-    population_aggregate = population_aggregate_SSP2;
+    for i=1:5
+        population_aggregate(:,i) = sum(population{i}(:,3:7),[]); 
+    end
 elseif UK_SSP == 3
     population = population_SSP3;
-    population_aggregate = population_aggregate_SSP3;
+    for i=1:5
+        population_aggregate(:,i) = sum(population{i}(:,3:7),[]); 
+    end
 elseif UK_SSP == 4
     population = population_SSP4;
-    population_aggregate = population_aggregate_SSP4;
+    for i=1:5
+        population_aggregate(:,i) = sum(population{i}(:,3:7),[]); 
+    end
 elseif UK_SSP == 5
     population = population_SSP5;
-    population_aggregate = population_aggregate_SSP5;
+    for i=1:5
+        population_aggregate(:,i) = sum(population{i}(:,3:7),[]); 
+    end
 end
 
 %%
@@ -180,14 +210,13 @@ if BiasCorrected == 0 %False, reads raw data which has 30 day months, no leap ye
         %  Baseline / near past TMean
         %  If raw data already read in once and saved then skip initial step
     if (ClimateScenario == 1 || ClimateScenario == 6) %% past or all climate scenarios
-%         if exist ('input_data_past.mat', 'file') %%can use to speed up
-%         if running offline from DAFNI - checks if file already exists.
-%            load ('input_data_past.mat')
-%            disp ('loading input data Past TMean')
-%            nClimScen = nClimScen+1; %counts # climate scenarios being run together
-% 
-%         elseif
-        if exist('ARCADIA-Tmean-raw-past', 'file')
+        if exist ('input_data_past.mat', 'file') %%can use to speed up
+        %if running offline from DAFNI - checks if file already exists.
+           load ('input_data_past.mat')
+           disp ('loading input data Past TMean')
+           nClimScen = nClimScen+1; %counts # climate scenarios being run together
+
+        elseif exist('ARCADIA-Tmean-raw-past', 'file')
             disp ('Read in daily TMean data (Past) for mortality estimates')
 
             dd = dir('ARCADIA-Tmean-raw-past\*.csv'); % all .csv files in folder
@@ -331,10 +360,9 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
 %         offline from DAFNI for same set of files.
            load ('input_data_past.mat')
            disp ('loading input data Past (Bias corrected)')
-           nClimScen = nClimScen+1; %counts # climate scenarios being run together
-% 
-%         elseif exist
-        elseif exist('ARCADIA-Tmean-BC-past', 'file')
+           nClimScen = nClimScen+1; %counts # climate scenarios being run together        
+        
+    elseif exist('ARCADIA-Tmean-BC-past', 'file')
             disp ('Read in daily TMean data (Past) for mortality estimates')
 
             dd = dir('ARCADIA-Tmean-BC-past\*.csv'); % all .csv files in folder
@@ -346,6 +374,7 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
                 fname = fullfile('ARCADIA-Tmean-BC-past', fileNames(ii)); %allocate each .csv data file to cell array
                 data_past{ii,2} = dlmread(fname{1},',',0,0);
                 data_past{ii,2}(:,1461:1461:end) = []; %delete leap year, every 1461 columns. Bias corrected data uses Gregorian Calendar.
+                data_past{ii,2}(:,10950) = 0; %Add back in dummy value for 31st December so years are even.
             end
 
             save('input_data_past.mat', 'data_past', '-v7.3') %~1GB (cell_IDs and data array)
@@ -362,10 +391,8 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
            load ('input_data_1.5C.mat')
            disp ('loading input data 1.5C (Bias corrected)')
            nClimScen = nClimScen+1; %counts # climate scenarios being run together
-% 
-%         elseif exist
 
-        elseif exist('ARCADIA-Tmean-BC-15', 'file')
+         elseif exist('ARCADIA-Tmean-BC-15', 'file')
             disp ('Read in daily TMean data (1.5DegreeC) for mortality estimates')
 
             dd = dir('ARCADIA-Tmean-BC-15\*.csv'); % all .csv files in folder
@@ -377,6 +404,7 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
                 fname = fullfile('ARCADIA-Tmean-BC-15', fileNames(ii)); %allocate each .csv data file to cell array
                 data_1_5C{ii,2} = dlmread(fname{1},',',0,0);
                 data_1_5C{ii,2}(:,1461:1461:end) = []; %delete leap year, every 1461 columns. Bias corrected data uses Gregorian Calendar.
+                data_1_5C{ii,2}(:,10950) = 0; %Add back in dummy value for 31st December so years are even.
             end
 
             save('input_data_1.5C.mat', 'data_1_5C', '-v7.3') %~1GB (cell_IDs and data array)
@@ -389,13 +417,12 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
     
     %  2degreeC
     if (ClimateScenario == 3 || ClimateScenario == 6) %% 2 degree or all climate scenarios
-        if exist ('input_data_2.0C.mat', 'file')
+         if exist ('input_data_2.0C.mat', 'file')
            load ('input_data_2.0C.mat')
            disp ('loading input data 2.0C (Bias corrected)')
            nClimScen = nClimScen+1; %counts # climate scenarios being run together
-% 
-%         elseif exist
-        elseif exist('ARCADIA-Tmean-BC-20', 'file')
+
+         elseif exist('ARCADIA-Tmean-BC-20', 'file')
             disp ('Read in daily TMean data (2.0DegreeC) for mortality estimates')
 
             dd = dir('ARCADIA-Tmean-BC-20\*.csv'); % all .csv files in folder
@@ -407,6 +434,7 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
                 fname = fullfile('ARCADIA-Tmean-BC-20', fileNames(ii)); %allocate each .csv data file to cell array
                 data_2_0C{ii,2} = dlmread(fname{1},',',0,0);
                 data_2_0C{ii,2}(:,1461:1461:end) = []; %delete leap year, every 1461 columns. Bias corrected data uses Gregorian Calendar.
+                data_2_0C{ii,2}(:,10950) = 0; %Add back in dummy value for 31st December so years are even.
             end
 
             save('input_data_2.0C.mat', 'data_2_0C', '-v7.3') %~1GB (cell_IDs and data array)
@@ -423,9 +451,8 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
            load ('input_data_3.0C.mat')
            disp ('loading input data 3.0C (Bias corrected)')
            nClimScen = nClimScen+1; %counts # climate scenarios being run together
-% 
-%         elseif exist
-        elseif exist('ARCADIA-Tmean-BC-30', 'file')
+ 
+         elseif exist('ARCADIA-Tmean-BC-30', 'file')
             disp ('Read in daily TMean data (3.0DegreeC) for mortality estimates')
 
             dd = dir('ARCADIA-Tmean-BC-30\*.csv'); % all .csv files in folder
@@ -437,6 +464,7 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
                 fname = fullfile('ARCADIA-Tmean-BC-30', fileNames(ii)); %allocate each .csv data file to cell array
                 data_3_0C{ii,2} = dlmread(fname{1},',',0,0);
                 data_3_0C{ii,2}(:,1461:1461:end) = []; %delete leap year, every 1461 columns. Bias corrected data uses Gregorian Calendar.
+                data_3_0C{ii,2}(:,10950) = 0; %Add back in dummy value for 31st December so years are even.
             end
 
             save('input_data_3.0C.mat', 'data_3_0C', '-v7.3') %~1GB (cell_IDs and data array)
@@ -455,11 +483,10 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
            disp ('loading input data 4.0C (Bias corrected)')
            nClimScen = nClimScen+1; %counts # climate scenarios being run together
 
-        %elseif 
         elseif exist('ARCADIA-Tmean-BC-40', 'file')
             disp ('Read in daily TMean data (4.0DegreeC) for mortality estimates')
 
-            dd = dir('ARCADIA-Tmean-BC-40\*.csv'); % all .csv files in folder
+             dd = dir('ARCADIA-Tmean-BC-40\*.csv'); % all .csv files in folder
             fileNames = {dd.name}; 
             data_4_0C = cell(numel(fileNames),2);
             data_4_0C(:,1) = regexprep(fileNames, '_UKCP18-12km_T.csv',''); %set name as grid_cell ID (lon_lat)
@@ -468,6 +495,7 @@ elseif BiasCorrected == 1 %reads bias corrected data and removes leap years.
                 fname = fullfile('ARCADIA-Tmean-BC-40', fileNames(ii)); %allocate each .csv data file to cell array
                 data_4_0C{ii,2} = dlmread(fname{1},',',0,0);
                 data_4_0C{ii,2}(:,1461:1461:end) = []; %delete leap year, every 1461 columns. Bias corrected data uses Gregorian Calendar.
+                data_4_0C{ii,2}(:,10950) = 0; %Add back in dummy value for 31st December so years are even.
             end
 
             save('input_data_4.0C.mat', 'data_4_0C', '-v7.3') %~1GB (cell_IDs and data array)
@@ -491,12 +519,29 @@ end
     disp('calculating gridID data')
     load lat_UK_RCM
     load long_UK_RCM
-    [nGridCells,nVar] = size(data_past);
-    gridID = zeros(nGridCells,2); % sets corresponding lon & lat for gridCells for plotting
+    
 
-    cellIndex = split(data_past(:,1),"_"); % remove hyphen. cellIndex used to pull out corresponding land-based lon_lat from UK & ROI grid
+    if(ClimateScenario == 1 || ClimateScenario == 6)
+        [nGridCells,nVar] = size(data_past); 
+        HEAT_Data = data_past;
+    elseif (ClimateScenario == 2)
+        [nGridCells,nVar] = size(data_1_5C); 
+        HEAT_Data = data_1_5C;
+    elseif (ClimateScenario == 3)
+        [nGridCells,nVar] = size(data_2_0C); 
+        HEAT_Data = data_2_0C;
+    elseif (ClimateScenario == 4)
+        [nGridCells,nVar] = size(data_3_0C); 
+        HEAT_Data = data_3_0C;
+    elseif (ClimateScenario == 5)
+        [nGridCells,nVar] = size(data_4_0C); 
+        HEAT_Data = data_4_0C;
+    end
+
+    cellIndex = split(HEAT_Data(:,1),"_"); % remove hyphen. cellIndex used to pull out corresponding land-based lon_lat from UK & ROI grid
     cellIndex = str2double(cellIndex);
-
+    gridID = zeros(nGridCells,2); % sets corresponding lon & lat for gridCells for plotting
+    
     for i = 1:nGridCells
         x = cellIndex(i,1);
         y = cellIndex(i,2);
@@ -515,7 +560,7 @@ end
 %[reorderedGridID, ia, ib] = intersect(lonIDIndex (:,1), gridID(:,1),'stable'); %index created to reorder the data from HEAT so rows align with coordinates of the socio-eocnomic data in calculations below.
 
 %% Define size of variables / Cell Arrays for calculations
-    [nRows,nCols] = size(data_past{1,2}); %set up TMean data array size
+    [nRows,nCols] = size(HEAT_Data{1,2}); %set up TMean data array size
     years = nCols/daysPerYear; %check years correspond to 30
     ageGroupCnt = size(Age_group,1); %counter to loop through mortality calculations for each age group
     
@@ -539,12 +584,17 @@ if (ClimateScenario == 1 || ClimateScenario == 6) %% baseline or all climate sce
         %Preallocate cell arrays
         ResultsPast = cell(adaptScen,1); %append all final gridded results for plotting and saving, for each age group, one array for each adaptation scenario
         for n = 1:adaptScen
-            ResultsPast{n} = zeros(nGridCells, 5);
+            ResultsPast{n} = zeros(nGridCells, 7);
         end
 
         ResultsPastAgeGroup = cell(adaptScen,1); %append all final results aggregated per age group, for plotting and saving, one array for each adaptation scenario
         for n = 1:adaptScen
-            ResultsPastAgeGroup{n} = zeros(ageGroupCnt-1, 3); 
+            ResultsPastAgeGroup{n} = zeros(ageGroupCnt, 5); 
+        end
+        
+        annualMortalityUK_CIs = cell(adaptScen,1);
+        for n = 1:adaptScen
+            annualMortalityUK_CIs{n} = zeros(1, 2); 
         end
 
         adapt = 1; %first run assumes no adaptation
@@ -600,7 +650,7 @@ if (ClimateScenario == 1 || ClimateScenario == 6) %% baseline or all climate sce
                 end
 
     %% average annual mortality per increment %%For plots - UK, All ages (m=1) only, no adaptation (a=1)
-                if (m==1) && (a==1)
+               if (m==1) && (a==1)
                     for h = 1:nGridCells
                        for r = 1:nRows
                             avMortPerIncrement{h}(r,:) = totMortPerIncrement{h}(r,:)/years;
@@ -610,46 +660,80 @@ if (ClimateScenario == 1 || ClimateScenario == 6) %% baseline or all climate sce
                        matrix = cat(dim+1,avMortPerIncrement{:});        % Convert to a (dim+1)-dimensional matrix
                        sumArray = sum(matrix,dim+1);  % Sum mortality across UK grid cells
                        avMortPerIncrementUK(2,:) = mean(sumArray); % average across 12 RCMs
+                       
+                       %calculating CI across the 12 RCMS per increment
+                       CI_increment = zeros(30,2);
+                        for q = 1:30
+                        stDev = std(sumArray(:,q)); 
+                        x = mean(sumArray(:,q));
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI_increment(q,:) = x + ts*SEM;                      %absolute CI
+                        %yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                        end
+                       
                 end
 
-    %% Calculate average annual risk (across years and across 12 GCMs) and percentile range (p10,p90)
-                for h = 1:nGridCells
-                    annMortality{h} = squeeze(nansum(reshape(dailyMort{h}.',daysPerYear,size(dailyMort{h},2)./daysPerYear,[]))).'; %re-shape array
-                    for r = 1:nRows
-                        avMortality(r,h) = mean(annMortality{h}(r,:),[1,2]); %mean across years for each GCM
+     %% Calculate Annual risk (across years and across 12 GCMs) and percentile range
+                    annMortalityUK = zeros(nRows, years);                
+                   for h = 1:nGridCells
+                        annMortality{h} = squeeze(nansum(reshape(dailyMort{h}.',daysPerYear,size(dailyMort{h},2)./daysPerYear,[]))).';
+                        annMortalityUK(:,:) = annMortalityUK(:,:) + annMortality{h}(:,:);
+                        for r = 1:nRows
+                            avMortality(r,h) = mean(annMortality{h}(r,:),[1,2]); %mean across years for each GCM
+                        end
+                        p_low = prctile(avMortality,(10),1);%10th and 90th percentile across years/GCMs
+                        p_high = prctile(avMortality,(90),1);
+                        av_ann_rcms = mean(annMortalityUK,2);
+                        av = mean(avMortality,1);
+                        sum_av = sum(av);
+                        sum_p_low = sum(p_low);
+                        sum_p_high = sum(p_high);
                     end
-                    %Absolute values
-                    p_low = prctile(avMortality,(10),1);%10th percentile across years/GCMs
-                    p_high = prctile(avMortality,(90),1);%90th percentile across years/GCMs
-                    av = mean(avMortality,1);%average
-                    sum_av = sum(av);
-                    sum_p_low = sum(p_low);
-                    sum_p_high = sum(p_high);
-                end
-                    % Values per 100,000 ppl
+                   
+                        Column_vector = annMortalityUK(:); %Convert array to column vector                    
+                        %calculating CI across the 12 RCMS per day not across
+                        %the 2205 gridcells
+                        % confidence interval
+                        stDev = std(av_ann_rcms); 
+                        x = mean(av_ann_rcms);
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI = x + ts*SEM;                      %absolute CI
+                        yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                        
+            
+                % Values per 100,000 ppl
                     av_per_population = sum_av/population_aggregate(m,1)*100000; %mean deaths per year/per 100,000 population - as a proportion of age group related population
                     p_low_per_population = sum_p_low/population_aggregate(m,1)*100000; %10th P deaths per year/per 1000 population 
                     p_high_per_population = sum_p_high/population_aggregate(m,1)*100000; %90th P deaths per year/per 1000 population 
 
+                    p_low_per_population_CI = CI(1,1)/population_aggregate(m,1)*100000; %10th P deaths per year/per 1000 population 
+                    p_high_per_population_CI = CI(1,2)/population_aggregate(m,1)*100000; %90th P deaths per year/per 1000 population 
+
+                    
                 %Save results for plotting:gridded - by age group category (m)
                 if m == 1 % all ages
                     ResultsPast{a}(1:h,3:5) = [av.', p_low.', p_high.']; %3 variables[nGridCells*3] * 5 Age_group categories (m)
                     ResultsPast{a}(1:h,1) = lonIDIndex(:,1); %longitude
                     ResultsPast{a}(1:h,2) = latIDIndex(:,1); %latitude
+                    annualMortalityUK_CIs{a} = CI;
                 %Save results for plotting - UK aggregate
-                    %ResultsPastAgeGroup{a}(m, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                    ResultsPastAgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                 elseif m==2
                     %ResultsPast{a}(1:h,6:8) = [av.', p_low.', p_high.'];
-                    ResultsPastAgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                    ResultsPastAgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                 elseif m==3
                     %ResultsPast{a}(1:h,9:11) = [av.', p_low.', p_high.'];
-                    ResultsPastAgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                    ResultsPastAgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                 elseif m==4
                     %ResultsPast{a}(1:h,12:14) = [av.', p_low.', p_high.'];
-                    ResultsPastAgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                    ResultsPastAgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                 elseif m==5
                     %ResultsPast{a}(1:h,15:17) = [av.', p_low.', p_high.'];
-                    ResultsPastAgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                    ResultsPastAgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                 end
                 h=1; %set back to 1
             end
@@ -659,7 +743,7 @@ if (ClimateScenario == 1 || ClimateScenario == 6) %% baseline or all climate sce
 
         % Files to SAVE
         fname = sprintf('ResultsPast_%d.mat', populationYearbaseline);
-        save(fname, 'ResultsPast', 'ResultsPastAgeGroup')
+        save(fname, 'ResultsPast', 'ResultsPastAgeGroup', 'annualMortalityUK_CIs','CI_increment')
         clear('dailyMort','totMortPerIncrement', 'avMortPerIncrement','annMortality', 'p_low', 'p_high', 'av', 'sum_av', 'sum_p_low', 'sum_p_high', 'av_per_population', 'p_low_per_population', 'p_high_per_population')  %daily data not used past this point - tidy up.
     else
         disp ('no input data - past')
@@ -678,12 +762,17 @@ if (ClimateScenario == 2|| ClimateScenario == 6) %% 1.5degree or all climate sce
         %set up cell array
         Results_1_5C = cell(adaptScen,1); %append all final results for plotting and saving, for each age group
         for n = 1:adaptScen
-            Results_1_5C{n} = zeros(nGridCells, 5); %set automatically in future based on gridcell rows
+            Results_1_5C{n} = zeros(nGridCells, 7); %set automatically in future based on gridcell rows
         end
 
         Results_1_5C_AgeGroup = cell(adaptScen,1); %append all final results for plotting and saving, for each age group and new array for each adaptation scenario
         for n = 1:adaptScen
-            Results_1_5C_AgeGroup{n} = zeros(ageGroupCnt-1, 3);
+            Results_1_5C_AgeGroup{n} = zeros(ageGroupCnt, 5);
+        end
+        
+        annualMortalityUK_CIs_1_5 = cell(adaptScen,1);
+        for n = 1:adaptScen
+            annualMortalityUK_CIs_1_5{n} = zeros(1, 2); 
         end
         
         adapt = 1; %first run assumes no adaptation
@@ -738,8 +827,8 @@ if (ClimateScenario == 2|| ClimateScenario == 6) %% 1.5degree or all climate sce
                     end
                 end          
                  
-             %% average annual mortality per increment %%for all ages only and no adaptation
-                    if (m==1) && (a==1)           
+             %% average annual mortality per increment %%for all ages only and no adaptation     
+                   if (m==1) && (a==1)           
                         for h = 1:nGridCells
                            for r = 1:nRows
                                 avMortPerIncrement{h}(r,:) = totMortPerIncrement{h}(r,:)/years;
@@ -749,44 +838,77 @@ if (ClimateScenario == 2|| ClimateScenario == 6) %% 1.5degree or all climate sce
                            matrix = cat(dim+1,avMortPerIncrement{:});        % Convert to a (dim+1)-dimensional matrix
                            sumArray = sum(matrix,dim+1);  % sum mortality across UK grid cells
                            avMortPerIncrementUK(l+2,:) = mean(sumArray);
-                    end
+                           
+                       %calculating CI across the 12 RCMS per increment
+                       CI_increment = zeros(30,2);
+                        for q = 1:30
+                        stDev = std(sumArray(:,q)); 
+                        x = mean(sumArray(:,q));
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI_increment(q,:) = x + ts*SEM;                      %absolute CI
+                        %yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                        end
+                   end
+                    
 
-                %% Calculate Annual risk (across years and across 12 GCMs) and percentile range
-                    for h = 1:nGridCells
+ %% Calculate Annual risk (across years and across 12 GCMs) and percentile range
+                   annMortalityUK = zeros(nRows, years);                
+                   for h = 1:nGridCells
                         annMortality{h} = squeeze(nansum(reshape(dailyMort{h}.',daysPerYear,size(dailyMort{h},2)./daysPerYear,[]))).';
+                        annMortalityUK(:,:) = annMortalityUK(:,:) + annMortality{h}(:,:);
                         for r = 1:nRows
                             avMortality(r,h) = mean(annMortality{h}(r,:),[1,2]); %mean across years for each GCM
                         end
                         p_low = prctile(avMortality,(10),1);%10th and 90th percentile across years/GCMs
                         p_high = prctile(avMortality,(90),1);
+                        av_ann_rcms = mean(annMortalityUK,2);
                         av = mean(avMortality,1);
                         sum_av = sum(av);
                         sum_p_low = sum(p_low);
                         sum_p_high = sum(p_high);
                     end
+                   
+                        Column_vector = annMortalityUK(:); %Convert array to column vector                    
+                        %calculating CI across the 12 RCMS per day not across
+                        %the 2205 gridcells
+                        % confidence interval
+                        stDev = std(av_ann_rcms); 
+                        x = mean(av_ann_rcms);
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI = x + ts*SEM;                      %absolute CI
+                        yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
 
+                        %population_aggregate = (sum(population{1,1}(:,3:7))).';
                         av_per_population = sum_av/population_aggregate(m,1+p)*100000; %mean deaths per year/per 100,000 population - as a proportion of total population
                         p_low_per_population = sum_p_low/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
                         p_high_per_population = sum_p_high/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
+                        
+                        p_low_per_population_CI = CI(1,1)/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
+                        p_high_per_population_CI = CI(1,2)/population_aggregate(m,1+p)*100000; %90th P deaths per year/per 1000 population 
 
                     %Save results for plotting -
                     if m == 1 % all ages
                         Results_1_5C{a}(1:h,3:5) = [av.', p_low.', p_high.']; %3 variables[nGridCells*3] * 5 Age_group categories (m)
                         Results_1_5C{a}(1:h,1) = lonIDIndex(:,1); %longitude
                         Results_1_5C{a}(1:h,2) = latIDIndex(:,1); %latitude
-                       % Results_1_5C_AgeGroup{a}(m, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.']; % UK aggregate per 100,000
+                        annualMortalityUK_CIs_1_5{a} = CI;
+                        Results_1_5C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.']; % UK aggregate per 100,000
                     elseif m==2
                        %Results_1_5C{a}(1:h,6:8) = [av.', p_low.', p_high.'];
-                        Results_1_5C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_1_5C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==3
                        %Results_1_5C{a}(1:h,9:11) = [av.', p_low.', p_high.'];
-                        Results_1_5C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_1_5C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==4
                        %Results_1_5C{a}(1:h,12:14) = [av.', p_low.', p_high.'];
-                        Results_1_5C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_1_5C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==5
                        %Results_1_5C{a}(1:h,15:17) = [av.', p_low.', p_high.'];
-                        Results_1_5C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_1_5C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     end
                     h=1; %set back to 1
                 end
@@ -798,15 +920,19 @@ if (ClimateScenario == 2|| ClimateScenario == 6) %% 1.5degree or all climate sce
             if l==1 %climate change only
             fname = sprintf('Results_1_5C_%s_%d_SSP%d.mat', adaptationName, populationYearbaseline, UK_SSP); 
             Results_1_5C_CC = Results_1_5C;
+            annualMortalityUK_CIs_1_5_CC = annualMortalityUK_CIs_1_5;
+            incrementUK_CIs_1_5_CC = CI_increment;
             Results_1_5C_AgeGroup_CC = Results_1_5C_AgeGroup;
-            save(fname, 'Results_1_5C_CC', 'Results_1_5C_AgeGroup_CC')
+            save(fname, 'Results_1_5C_CC', 'Results_1_5C_AgeGroup_CC', 'annualMortalityUK_CIs_1_5_CC', 'incrementUK_CIs_1_5_CC')
 
             elseif l==2 %Climate change and population change
             fname = sprintf('Results_1_5C%s_%s_%d_SSP%d.mat', '_SE', adaptationName, populationYear15degree, UK_SSP);
             Results_1_5C_SE = Results_1_5C;
             Results_1_5C_AgeGroup_SE = Results_1_5C_AgeGroup;
-            save(fname,'Results_1_5C_SE', 'Results_1_5C_AgeGroup_SE') 
-            clear('dailyMort','totMortPerIncrement', 'avMortPerIncrement','annMortality', 'p_low', 'p_high', 'av', 'sum_av', 'sum_p_low', 'sum_p_high', 'av_per_population', 'p_low_per_population', 'p_high_per_population')  %data not used past this point
+            annualMortalityUK_CIs_1_5_SE = annualMortalityUK_CIs_1_5;
+            incrementUK_CIs_1_5_SE = CI_increment;
+            save(fname,'Results_1_5C_SE', 'Results_1_5C_AgeGroup_SE', 'annualMortalityUK_CIs_1_5_SE', 'incrementUK_CIs_1_5_SE') 
+            %clear('dailyMort','totMortPerIncrement', 'avMortPerIncrement','annMortality', 'p_low', 'p_high', 'av', 'sum_av', 'sum_p_low', 'sum_p_high', 'av_per_population', 'p_low_per_population', 'p_high_per_population')  %data not used past this point
             end
             
             if populationYear15degree == 2020
@@ -815,7 +941,7 @@ if (ClimateScenario == 2|| ClimateScenario == 6) %% 1.5degree or all climate sce
                 p=2;
             elseif populationYear15degree == 2050
                 p=3;
-            elseif populationYear15degree == 2100
+            elseif populationYear15degree == 2080
                 p=4;
             end
         end
@@ -838,14 +964,19 @@ if (ClimateScenario == 3|| ClimateScenario == 6) %% 2degree or all climate scena
 
             Results_2C = cell(adaptScen,1); %append all final results for plotting and saving, for each age group
             for n = 1:adaptScen
-                Results_2C{n} = zeros(nGridCells, 5); %set automatically in future based on gridcell rows
+                Results_2C{n} = zeros(nGridCells, 7); %set automatically in future based on gridcell rows
             end
 
             Results_2C_AgeGroup = cell(adaptScen,1); %append all final results for plotting and saving, for each age group and new array for each adaptation scenario
             for n = 1:adaptScen
-                Results_2C_AgeGroup{n} = zeros(ageGroupCnt-1, 3); %set automatically in future based on gridcell rows
+                Results_2C_AgeGroup{n} = zeros(ageGroupCnt, 5); %set automatically in future based on gridcell rows
             end
 
+            annualMortalityUK_CIs_2 = cell(adaptScen,1);
+            for n = 1:adaptScen
+            annualMortalityUK_CIs_2{n} = zeros(1, 2); 
+            end
+            
             adapt = 1; %first run assumes no adaptation
 
             for a = 1:adaptScen
@@ -900,6 +1031,7 @@ if (ClimateScenario == 3|| ClimateScenario == 6) %% 2degree or all climate scena
                 end          
 
     %% average annual mortality per increment %%for all ages only
+
                     if (m==1) && (a==1)        
                         for h = 1:nGridCells
                            for r = 1:nRows
@@ -910,44 +1042,76 @@ if (ClimateScenario == 3|| ClimateScenario == 6) %% 2degree or all climate scena
                            matrix = cat(dim+1,avMortPerIncrement{:});        % Convert to a (dim+1)-dimensional matrix
                            sumArray = sum(matrix,dim+1);  % Get the mean across 3d array (summing mortality across UK grid cells)
                            avMortPerIncrementUK(l+4,:) = mean(sumArray);
+                           
+                       %calculating CI across the 12 RCMS per increment
+                       CI_increment = zeros(30,2);
+                        for q = 1:30
+                        stDev = std(sumArray(:,q)); 
+                        x = mean(sumArray(:,q));
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI_increment(q,:) = x + ts*SEM;                      %absolute CI
+                        %yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                        end
                     end
 
-        %% Calculate Annual risk (across years and across 12 GCMs) and percentile range
-                    for h = 1:nGridCells
+ %% Calculate Annual risk (across years and across 12 GCMs) and percentile range
+                    annMortalityUK = zeros(nRows, years);                
+                   for h = 1:nGridCells
                         annMortality{h} = squeeze(nansum(reshape(dailyMort{h}.',daysPerYear,size(dailyMort{h},2)./daysPerYear,[]))).';
+                        annMortalityUK(:,:) = annMortalityUK(:,:) + annMortality{h}(:,:);
                         for r = 1:nRows
                             avMortality(r,h) = mean(annMortality{h}(r,:),[1,2]); %mean across years for each GCM
                         end
                         p_low = prctile(avMortality,(10),1);%10th and 90th percentile across years/GCMs
                         p_high = prctile(avMortality,(90),1);
+                        av_ann_rcms = mean(annMortalityUK,2);
                         av = mean(avMortality,1);
                         sum_av = sum(av);
                         sum_p_low = sum(p_low);
                         sum_p_high = sum(p_high);
                     end
-
+                   
+                        Column_vector = annMortalityUK(:); %Convert array to column vector                    
+                        %calculating CI across the 12 RCMS per day not across
+                        %the 2205 gridcells
+                        % confidence interval
+                        stDev = std(av_ann_rcms); 
+                        x = mean(av_ann_rcms);
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI = x + ts*SEM;                      %absolute CI
+                        yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                    
+                    %population_aggregate = (sum(population{1,1}(:,3:7))).';
                     av_per_population = sum_av/population_aggregate(m,1+p)*100000; %mean deaths per year/per 100,000 population - as a proportion of total population
                     p_low_per_population = sum_p_low/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
                     p_high_per_population = sum_p_high/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
+
+                    p_low_per_population_CI = CI(1,1)/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
+                    p_high_per_population_CI = CI(1,2)/population_aggregate(m,1+p)*100000; %90th P deaths per year/per 1000 population 
 
                     %Save results for plotting -
                     if m == 1
                         Results_2C{a}(1:h,3:5) = [av.', p_low.', p_high.']; %3 variables[nGridCells*3] * 5 Age_group categories (m)
                         Results_2C{a}(1:h,1) = lonIDIndex(:,1); %longitude
                         Results_2C{a}(1:h,2) = latIDIndex(:,1); %latitude
-                        %Results_2C_AgeGroup{a}(m, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.']; % UK aggregate per 100,000
+                        annualMortalityUK_CIs_2{a} = CI;
+                        Results_2C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.']; % UK aggregate per 100,000
                     elseif m==2
                         %Results_2C{a}(1:h,6:8) = [av.', p_low.', p_high.'];
-                        Results_2C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_2C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==3
                         %Results_2C{a}(1:h,9:11) = [av.', p_low.', p_high.'];
-                        Results_2C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_2C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==4
                         %Results_2C{a}(1:h,12:14) = [av.', p_low.', p_high.'];
-                        Results_2C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_2C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==5
                         %Results_2C{a}(1:h,15:17) = [av.', p_low.', p_high.'];
-                        Results_2C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_2C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     end
                     h=1; %set back to 1
                 end
@@ -958,12 +1122,16 @@ if (ClimateScenario == 3|| ClimateScenario == 6) %% 2degree or all climate scena
             fname = sprintf('Results_2C_%s_%d_SSP%d.mat', adaptationName,populationYearbaseline,UK_SSP);
             Results_2C_CC = Results_2C;
             Results_2C_AgeGroup_CC = Results_2C_AgeGroup;
-            save(fname, 'Results_2C_CC', 'Results_2C_AgeGroup_CC')
+            annualMortalityUK_CIs_2_CC = annualMortalityUK_CIs_2;
+            incrementUK_CIs_2_CC = CI_increment;
+            save(fname, 'Results_2C_CC', 'Results_2C_AgeGroup_CC', 'annualMortalityUK_CIs_2_CC', 'incrementUK_CIs_2_CC')
             elseif l==2
             fname = sprintf('Results_2C%s_%s_%d_SSP%d.mat', '_SE', adaptationName, populationYear2degree,UK_SSP);
             Results_2C_SE = Results_2C;
             Results_2C_AgeGroup_SE = Results_2C_AgeGroup;
-            save(fname, 'Results_2C_SE', 'Results_2C_AgeGroup_SE') 
+            annualMortalityUK_CIs_2_SE = annualMortalityUK_CIs_2;
+            incrementUK_CIs_2_SE = CI_increment;
+            save(fname, 'Results_2C_SE', 'Results_2C_AgeGroup_SE', 'annualMortalityUK_CIs_2_SE', 'incrementUK_CIs_2_SE') 
             clear('dailyMort','totMortPerIncrement', 'avMortPerIncrement','annMortality', 'p_low', 'p_high', 'av', 'sum_av', 'sum_p_low', 'sum_p_high', 'av_per_population', 'p_low_per_population', 'p_high_per_population')  %data not used past this point
             end
 
@@ -971,13 +1139,13 @@ if (ClimateScenario == 3|| ClimateScenario == 6) %% 2degree or all climate scena
                 p=2;
             elseif populationYear2degree == 2050
                 p=3;
-            elseif populationYear2degree == 2100
+            elseif populationYear2degree == 2080
                 p=4;
             end
         end
-    else
+     else
         disp ('no input data - 2degree')
-    end
+     end
     save ('avMortPerIncrementUK.mat', 'avMortPerIncrementUK') % Used to plot deaths per increment for paper.
 end
 
@@ -994,12 +1162,17 @@ if (ClimateScenario == 4|| ClimateScenario == 6) %% 3degree or all climate scena
         %set up cell array
         Results_3C = cell(adaptScen,1); %append all final results for plotting and saving, for each age group
         for n = 1:adaptScen
-            Results_3C{n} = zeros(nGridCells, 5); %set automatically in future based on gridcell rows
+            Results_3C{n} = zeros(nGridCells, 7); %set automatically in future based on gridcell rows
         end
 
         Results_3C_AgeGroup = cell(adaptScen,1); %append all final results for plotting and saving, for each age group and new array for each adaptation scenario
         for n = 1:adaptScen
-            Results_3C_AgeGroup{n} = zeros(ageGroupCnt-1, 3); %set automatically in future based on gridcell rows
+            Results_3C_AgeGroup{n} = zeros(ageGroupCnt, 5); %set automatically in future based on gridcell rows
+        end
+        
+        annualMortalityUK_CIs_3 = cell(adaptScen,1);
+        for n = 1:adaptScen
+        annualMortalityUK_CIs_3{n} = zeros(1, 2); 
         end
 
         adapt = 1; %first run assumes no adaptation
@@ -1053,7 +1226,7 @@ if (ClimateScenario == 4|| ClimateScenario == 6) %% 3degree or all climate scena
                     end
                 end  
 
-    %% average annual mortality per increment %%for all ages only
+    %% average annual mortality per increment %%for all ages only 
                     if (m==1) && (a==1)            
                         for h = 1:nGridCells
                            for r = 1:nRows
@@ -1064,44 +1237,77 @@ if (ClimateScenario == 4|| ClimateScenario == 6) %% 3degree or all climate scena
                            matrix = cat(dim+1,avMortPerIncrement{:});        % Convert to a (dim+1)-dimensional matrix
                            sumArray = sum(matrix,dim+1);  % sum mortality across UK grid cells
                            avMortPerIncrementUK(l+6,:) = mean(sumArray);
+                           
+                       %calculating CI across the 12 RCMS per increment
+                       CI_increment = zeros(30,2);
+                        for q = 1:30
+                        stDev = std(sumArray(:,q)); 
+                        x = mean(sumArray(:,q));
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI_increment(q,:) = x + ts*SEM;                      %absolute CI
+                        %yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                        end
                     end
 
-    %% Calculate Annual risk (across years and across 12 GCMs) and percentile range
-                    for h = 1:nGridCells
+ %% Calculate Annual risk (across years and across 12 GCMs) and percentile range
+                    annMortalityUK = zeros(nRows, years);                
+                   for h = 1:nGridCells
                         annMortality{h} = squeeze(nansum(reshape(dailyMort{h}.',daysPerYear,size(dailyMort{h},2)./daysPerYear,[]))).';
-                        %annMortalityDistribution{m}(:,:) = annMortalityDistribution{m}(:,:) + annMortality{h}(:,:); % used to look at distribution of all years
+                        annMortalityUK(:,:) = annMortalityUK(:,:) + annMortality{h}(:,:);
                         for r = 1:nRows
                             avMortality(r,h) = mean(annMortality{h}(r,:),[1,2]); %mean across years for each GCM
                         end
                         p_low = prctile(avMortality,(10),1);%10th and 90th percentile across years/GCMs
                         p_high = prctile(avMortality,(90),1);
+                        av_ann_rcms = mean(annMortalityUK,2);
                         av = mean(avMortality,1);
                         sum_av = sum(av);
                         sum_p_low = sum(p_low);
                         sum_p_high = sum(p_high);
                     end
+                   
+                        Column_vector = annMortalityUK(:); %Convert array to column vector                    
+                        %calculating CI across the 12 RCMS per day not across
+                        %the 2205 gridcells
+                        % confidence interval
+                        stDev = std(av_ann_rcms); 
+                        x = mean(av_ann_rcms);
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI = x + ts*SEM;                      %absolute CI
+                        yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+       
+                    
+                    %population_aggregate = (sum(population{1,1}(:,3:7))).';
                     av_per_population = sum_av/population_aggregate(m,1+p)*100000; %mean deaths per year/per 100,000 population - as a proportion of total population
                     p_low_per_population = sum_p_low/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
                     p_high_per_population = sum_p_high/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
+
+                    p_low_per_population_CI = CI(1,1)/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
+                    p_high_per_population_CI = CI(1,2)/population_aggregate(m,1+p)*100000; %90th P deaths per year/per 1000 population 
 
                     %Save results for plotting -
                     if m == 1
                         Results_3C{a}(1:h,3:5) = [av.', p_low.', p_high.']; %3 variables[nGridCells*3] * 5 Age_group categories (m)
                         Results_3C{a}(1:h,1) = lonIDIndex(:,1); %longitude
                         Results_3C{a}(1:h,2) = latIDIndex(:,1); %latitude
-                        %Results_3C_AgeGroup{a}(m, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.']; % UK aggregate per 100,000
+                        annualMortalityUK_CIs_3{a} = CI;
+                        Results_3C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.']; % UK aggregate per 100,000
                     elseif m==2
                        %Results_3C{a}(1:h,6:8) = [av.', p_low.', p_high.'];
-                        Results_3C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_3C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==3
                         %Results_3C{a}(1:h,9:11) = [av.', p_low.', p_high.'];
-                        Results_3C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_3C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==4
                         %Results_3C{a}(1:h,12:14) = [av.', p_low.', p_high.'];
-                        Results_3C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_3C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==5
                         %Results_3C{a}(1:h,15:17) = [av.', p_low.', p_high.'];
-                        Results_3C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_3C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     end
                     h=1; %set back to 1
                 end
@@ -1113,19 +1319,23 @@ if (ClimateScenario == 4|| ClimateScenario == 6) %% 3degree or all climate scena
             fname = sprintf('Results_3C_%s_%d_SSP%d.mat', adaptationName, populationYearbaseline, UK_SSP);
             Results_3C_CC = Results_3C;
             Results_3C_AgeGroup_CC = Results_3C_AgeGroup;
-            save(fname, 'Results_3C_CC', 'Results_3C_AgeGroup_CC')
+            annualMortalityUK_CIs_3_CC = annualMortalityUK_CIs_3;
+            incrementUK_CIs_3_CC = CI_increment;
+            save(fname, 'Results_3C_CC', 'Results_3C_AgeGroup_CC', 'annualMortalityUK_CIs_3_CC', 'incrementUK_CIs_3_CC')
             clear('dailyMort','totMortPerIncrement', 'avMortPerIncrement','annMortality', 'p_low', 'p_high', 'av', 'sum_av', 'sum_p_low', 'sum_p_high', 'av_per_population', 'p_low_per_population', 'p_high_per_population')  %daily data not used past this point
             elseif l==2
             fname = sprintf('Results_3C%s_%s_%d_SSP%d.mat', '_SE', adaptationName, populationYear3degree, UK_SSP);
             Results_3C_SE = Results_3C;
             Results_3C_AgeGroup_SE = Results_3C_AgeGroup;
-            save(fname,'Results_3C_SE', 'Results_3C_AgeGroup_SE') 
+            annualMortalityUK_CIs_3_SE = annualMortalityUK_CIs_3;
+            incrementUK_CIs_3_SE = CI_increment;
+            save(fname,'Results_3C_SE', 'Results_3C_AgeGroup_SE', 'annualMortalityUK_CIs_3_SE', 'incrementUK_CIs_3_SE') 
             clear('dailyMort','totMortPerIncrement', 'avMortPerIncrement','annMortality', 'p_low', 'p_high', 'av', 'sum_av', 'sum_p_low', 'sum_p_high', 'av_per_population', 'p_low_per_population', 'p_high_per_population')  %data not used past this point
             end
             
             if  populationYear3degree == 2050
                 p=3;
-            elseif populationYear3degree == 2100
+            elseif populationYear3degree == 2080
                 p=4;
             end
         end
@@ -1149,14 +1359,19 @@ if (ClimateScenario == 5|| ClimateScenario == 6) %% 4degree or all climate scena
         %set up cell array
         Results_4C = cell(adaptScen,1); %append all final results for plotting and saving, for each age group
         for n = 1:adaptScen
-            Results_4C{n} = zeros(nGridCells, 5); %set automatically in future based on gridcell rows
+            Results_4C{n} = zeros(nGridCells, 7); %set automatically in future based on gridcell rows
         end
 
         Results_4C_AgeGroup = cell(adaptScen,1); %append all final results for plotting and saving, for each age group and new array for each adaptation scenario
         for n = 1:adaptScen
-            Results_4C_AgeGroup{n} = zeros(ageGroupCnt-1, 3); %set automatically in future based on gridcell rows
+            Results_4C_AgeGroup{n} = zeros(ageGroupCnt, 5); %set automatically in future based on gridcell rows
         end
 
+        annualMortalityUK_CIs_4 = cell(adaptScen,1);
+        for n = 1:adaptScen
+        annualMortalityUK_CIs_4{n} = zeros(1, 2); 
+        end
+        
         adapt = 1; %first run assumes no adaptation
             for a = 1:adaptScen
 
@@ -1209,6 +1424,7 @@ if (ClimateScenario == 5|| ClimateScenario == 6) %% 4degree or all climate scena
                 end  
 
     %% average annual mortality per increment %%for all ages only
+    annMortalityUK = zeros(nRows, years); 
                     if (m==1) && (a==1)            
                         for h = 1:nGridCells
                            for r = 1:nRows
@@ -1219,44 +1435,86 @@ if (ClimateScenario == 5|| ClimateScenario == 6) %% 4degree or all climate scena
                            matrix = cat(dim+1,avMortPerIncrement{:});        % Convert to a (dim+1)-dimensional matrix
                            sumArray = sum(matrix,dim+1);  % sum mortality across UK grid cells
                            avMortPerIncrementUK(l+8,:) = mean(sumArray);
+                           
+                       %calculating CI across the 12 RCMS per increment
+                       CI_increment = zeros(30,2);
+                        for q = 1:30
+                        stDev = std(sumArray(:,q)); 
+                        x = mean(sumArray(:,q));
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI_increment(q,:) = x + ts*SEM;                      %absolute CI
+                        %yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                        end
                     end
 
     %% Calculate Annual risk (across years and across 12 GCMs) and percentile range
-                    for h = 1:nGridCells
+                    annMortalityUK = zeros(nRows, years);
+                    CI_spatial = zeros(nGridCells,2);
+                   for h = 1:nGridCells
                         annMortality{h} = squeeze(nansum(reshape(dailyMort{h}.',daysPerYear,size(dailyMort{h},2)./daysPerYear,[]))).';
-                        %annMortalityDistribution{m}(:,:) = annMortalityDistribution{m}(:,:) + annMortality{h}(:,:); % used to look at distribution of all years
+                        annMortalityUK(:,:) = annMortalityUK(:,:) + annMortality{h}(:,:);
                         for r = 1:nRows
                             avMortality(r,h) = mean(annMortality{h}(r,:),[1,2]); %mean across years for each GCM
                         end
                         p_low = prctile(avMortality,(10),1);%10th and 90th percentile across years/GCMs
                         p_high = prctile(avMortality,(90),1);
+                        av_ann_rcms = mean(annMortalityUK,2);
                         av = mean(avMortality,1);
                         sum_av = sum(av);
                         sum_p_low = sum(p_low);
                         sum_p_high = sum(p_high);
+                        
+                        stDev = std(avMortality(:, h)); 
+                        x = mean(avMortality(:, h));
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI_spatial(h,:) = x + ts*SEM;                      %absolute CI
+                        %yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                        
                     end
+                   
+                        %Column_vector = annMortalityUK(:); %Convert array to column vector                    
+                        %calculating CI across the 12 RCMS per day not across
+                        %the 2205 gridcells
+                        % confidence interval
+                        stDev = std(av_ann_rcms); 
+                        x = mean(av_ann_rcms);
+                        sqRoot = sqrt(12);
+                        SEM = stDev/sqRoot;% 
+                        ts = tinv([0.025  0.975],12-1);                 % T-Score
+                        CI = x + ts*SEM;                      %absolute CI
+                        yCI95 = bsxfun(@times, SEM, ts(:));   %value above and below
+                        
+                    %population_aggregate = (sum(population{1,1}(:,3:7))).';
                     av_per_population = sum_av/population_aggregate(m,1+p)*100000; %mean deaths per year/per 100,000 population - as a proportion of total population
                     p_low_per_population = sum_p_low/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
                     p_high_per_population = sum_p_high/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
 
+                    p_low_per_population_CI = CI(1,1)/population_aggregate(m,1+p)*100000; %10th P deaths per year/per 1000 population 
+                    p_high_per_population_CI = CI(1,2)/population_aggregate(m,1+p)*100000; %90th P deaths per year/per 1000 population 
+
                     %Save results for plotting -
                     if m == 1
-                        Results_4C{a}(1:h,3:5) = [av.', p_low.', p_high.']; %3 variables[nGridCells*3] * 5 Age_group categories (m)
+                        Results_4C{a}(1:h,3:7) = [av.', p_low.', p_high.', CI_spatial]; %3 variables[nGridCells*3] * 5 Age_group categories (m)
                         Results_4C{a}(1:h,1) = lonIDIndex(:,1); %longitude
                         Results_4C{a}(1:h,2) = latIDIndex(:,1); %latitude
-                        %Results_3C_AgeGroup{a}(m, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.']; % UK aggregate per 100,000
+                        annualMortalityUK_CIs_4{a} = CI;
+                        Results_4C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.']; % UK aggregate per 100,000
                     elseif m==2
                        %Results_3C{a}(1:h,6:8) = [av.', p_low.', p_high.'];
-                        Results_4C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_4C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==3
                         %Results_3C{a}(1:h,9:11) = [av.', p_low.', p_high.'];
-                        Results_4C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_4C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==4
                         %Results_4C{a}(1:h,12:14) = [av.', p_low.', p_high.'];
-                        Results_4C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_4C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     elseif m==5
                         %Results_4C{a}(1:h,15:17) = [av.', p_low.', p_high.'];
-                        Results_4C_AgeGroup{a}(m-1, 1:3) = [av_per_population.', p_low_per_population.', p_high_per_population.'];
+                        Results_4C_AgeGroup{a}(m, 1:5) = [av_per_population.', p_low_per_population.', p_high_per_population.', p_low_per_population_CI.', p_high_per_population_CI.'];
                     end
                     h=1; %set back to 1
                 end
@@ -1268,13 +1526,17 @@ if (ClimateScenario == 5|| ClimateScenario == 6) %% 4degree or all climate scena
             fname = sprintf('Results_4C_%s_%d_SSP%d.mat', adaptationName, populationYearbaseline, UK_SSP);
             Results_4C_CC = Results_4C;
             Results_4C_AgeGroup_CC = Results_4C_AgeGroup;
-            save(fname, 'Results_4C_CC', 'Results_4C_AgeGroup_CC')
+            annualMortalityUK_CIs_4_CC = annualMortalityUK_CIs_4;
+            incrementUK_CIs_4_CC = CI_increment;
+            save(fname, 'Results_4C_CC', 'Results_4C_AgeGroup_CC', 'annualMortalityUK_CIs_4_CC', 'incrementUK_CIs_4_CC')
             clear('dailyMort','totMortPerIncrement', 'avMortPerIncrement','annMortality', 'p_low', 'p_high', 'av', 'sum_av', 'sum_p_low', 'sum_p_high', 'av_per_population', 'p_low_per_population', 'p_high_per_population')  %daily data not used past this point
             elseif l==2
             fname = sprintf('Results_4C%s_%s_%d_SSP%d.mat', '_SE', adaptationName, populationYear4degree, UK_SSP);
             Results_4C_SE = Results_4C;
             Results_4C_AgeGroup_SE = Results_4C_AgeGroup;
-            save(fname,'Results_4C_SE', 'Results_4C_AgeGroup_SE') 
+            annualMortalityUK_CIs_4_SE = annualMortalityUK_CIs_4;
+            incrementUK_CIs_4_SE = CI_increment;
+            save(fname,'Results_4C_SE', 'Results_4C_AgeGroup_SE', 'annualMortalityUK_CIs_4_SE', 'incrementUK_CIs_4_SE') 
             clear('dailyMort','totMortPerIncrement', 'avMortPerIncrement','annMortality', 'p_low', 'p_high', 'av', 'sum_av', 'sum_p_low', 'sum_p_high', 'av_per_population', 'p_low_per_population', 'p_high_per_population')  %data not used past this point
             end
             
@@ -1290,114 +1552,131 @@ end
 %Absolute values also split by age group - differs to mortality per 100,000
 %population per age group.
 % Only run when all climate scenarios run.
-%     if ClimateScenario == 6
-% 
-%         AvAnnualDeathsUK = zeros(2,15);
-%         AvAnnualDeathsUK_SE = zeros(2,15);
-%         AvAnnualDeathsAdapt = zeros(2,5);
-%         AvAnnualDeathsAdapt_SE = zeros(2,5);
-% 
-%         for a = 1:2
-%             % For all ages
-%             AvAnnualDeathsUK(a,1:3) = [sum(ResultsPast{a}(:,3)), sum(ResultsPast{a}(:,4)), sum(ResultsPast{a}(:,5))]; % Near Past
-%             AvAnnualDeathsUK(a,4:6) = [sum(Results_1_5C_CC{a}(:,3)), sum(Results_1_5C_CC{a}(:,4)), sum(Results_1_5C_CC{a}(:,5))]; % 1.5 degree
-%             AvAnnualDeathsUK(a,7:9) = [sum(Results_2C_CC{a}(:,3)), sum(Results_2C_CC{a}(:,4)), sum(Results_2C_CC{a}(:,5))]; % 2 degree C
-%             AvAnnualDeathsUK(a,10:12) = [sum(Results_3C_CC{a}(:,3)), sum(Results_3C_CC{a}(:,4)), sum(Results_3C_CC{a}(:,5))]; % 3 degree C
-%             AvAnnualDeathsUK(a,13:15) = [sum(Results_4C_CC{a}(:,3)), sum(Results_4C_CC{a}(:,4)), sum(Results_4C_CC{a}(:,5))]; % 4 degree C
-%             
-%             AvAnnualDeathsUK_SE(a,1:3) = [sum(ResultsPast{a}(:,3)), sum(ResultsPast{a}(:,4)), sum(ResultsPast{a}(:,5))];% Near Past (population same in both scenarios)
-%             AvAnnualDeathsUK_SE(a,4:6) = [sum(Results_1_5C_SE{a}(:,3)), sum(Results_1_5C_SE{a}(:,4)), sum(Results_1_5C_SE{a}(:,5))]; % 1.5 degree CC+SE
-%             AvAnnualDeathsUK_SE(a,7:9) = [sum(Results_2C_SE{a}(:,3)), sum(Results_2C_SE{a}(:,4)), sum(Results_2C_SE{a}(:,5))]; %2 degree C CC+SE
-%             AvAnnualDeathsUK_SE(a,10:12) = [sum(Results_3C_SE{a}(:,3)), sum(Results_3C_SE{a}(:,4)), sum(Results_3C_SE{a}(:,5))]; % 3 degree C CC+SE
-%             AvAnnualDeathsUK_SE(a,13:15) = [sum(Results_4C_SE{a}(:,3)), sum(Results_4C_SE{a}(:,4)), sum(Results_4C_SE{a}(:,5))]; % 4 degree C CC+SE
-% 
-%         end
-% 
-%             %difference between NO adaptation and WITH adaptation strategies for stacked
-%             %plot (rows = adapt scenarios, columns = time-periods).
-%             AvAnnualDeathsAdapt(1,1:5) = [sum(ResultsPast{2}(:,3)), sum(Results_1_5C_CC{2}(:,3)), sum(Results_2C_CC{2}(:,3)), sum(Results_3C_CC{2}(:,3)), sum(Results_4C_CC{2}(:,3))];
-%             AvAnnualDeathsAdapt(2,1:5) = [sum(ResultsPast{1}(:,3))- sum(ResultsPast{2}(:,3)), sum(Results_1_5C_CC{1}(:,3))-sum(Results_1_5C_CC{2}(:,3)), sum(Results_2C_CC{1}(:,3))-sum(Results_2C_CC{2}(:,3)), sum(Results_3C_CC{1}(:,3)) - sum(Results_3C_CC{2}(:,3)), sum(Results_4C_CC{1}(:,3)) - sum(Results_4C_CC{2}(:,3))]; 
-%             AvAnnualDeathsAdapt_SE(1,1:5) = [sum(ResultsPast{2}(:,3)), sum(Results_1_5C_SE{2}(:,3)), sum(Results_2C_SE{2}(:,3)), sum(Results_3C_SE{2}(:,3)),sum(Results_4C_SE{2}(:,3))];
-%             AvAnnualDeathsAdapt_SE(2,1:5) = [sum(ResultsPast{1}(:,3))-sum(ResultsPast{2}(:,3)), sum(Results_1_5C_SE{1}(:,3))-sum(Results_1_5C_SE{2}(:,3)), sum(Results_2C_SE{1}(:,3))-sum(Results_2C_SE{2}(:,3)), sum(Results_3C_SE{1}(:,3))-sum(Results_3C_SE{2}(:,3)), sum(Results_4C_SE{1}(:,3))-sum(Results_4C_SE{2}(:,3))];
-% 
-%             %% PLOTS
-%             % Create some initial output figures
-% 
-%             %1. Average annual deaths for each scenario (All ages) CC-only and CC+SE
-% 
-%             figure;
-%             M = max(AvAnnualDeathsUK_SE(1,:)*1.1); %set y axis max limit across sub-plots
-%             x=1:5;
-%             subplot(1,2,1);
-% 
-%             % Create bar and set individual colours
-%             b = bar(AvAnnualDeathsUK(1,[1,4,7,10,13]), 'FaceColor',[0.850980401039124 0.325490206480026 0.0980392172932625]);
-%             b.FaceColor = 'flat';
-%             b.CData(1,:) = [1 0.843137264251709 0];
-%             b.CData(2,:) = [0.87058824300766 0.490196079015732 0];
-%             b.CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b.CData(4,:) = [0.600000023841858 0.200000002980232 0];
-%             b.CData(5,:) = [0.40,0.00,0.00];
-% 
-%             hold on
-%             p_errhigh = AvAnnualDeathsUK(1,[3,6,9,12,15])- AvAnnualDeathsUK(1,[1,4,7,10,13]); %90th p - average
-%             p_errlow = AvAnnualDeathsUK(1,[1,4,7,10,13])-AvAnnualDeathsUK(1,[2,5,8,11,14]); % average - 10th p)
-% 
-%             er = errorbar(x, AvAnnualDeathsUK(1,[1,4,7,10,13]), p_errlow, p_errhigh, 'LineWidth',1);    
-%             er.Color = [0 0 0];                            
-%             er.LineStyle = 'none';
-% 
-%             % Create ylabel
-%             ylabel('Average Annual Heat Related Deaths');
-% 
-%             % Create xlabel
-%             xlabel('Climate Scenario');
-% 
-%             % Create title
-%             title('Climate Change Only');
-% 
-%             % Set the remaining axes properties
-%             set (gca, 'ylim', [0 M]);
-%             set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'Past','1.5','2.0','3.0','4.0'},'YGrid',...
-%                 'on');
-%             ax = gca;
-%             ax.YAxis.Exponent = 0;
-% 
-%             subplot(1,2,2);
-%             % Create bar
-%             b= bar(AvAnnualDeathsUK_SE(1,[1,4,7,10,13]), 'FaceColor',[0.850980401039124 0.325490206480026 0.0980392172932625]);
-%             b.FaceColor = 'flat';
-%             b.CData(1,:) = [1 0.843137264251709 0];
-%             b.CData(2,:) = [0.87058824300766 0.490196079015732 0];
-%             b.CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b.CData(4,:) = [0.600000023841858 0.200000002980232 0];
-%             b.CData(5,:) = [0.40,0.00,0.00];
-% 
-%             hold on
+    if ClimateScenario == 6
+
+        AvAnnualDeathsUK = zeros(2,15);
+        AvAnnualDeathsUK_SE = zeros(2,15);
+        AvAnnualDeathsAdapt = zeros(2,5);
+        AvAnnualDeathsAdapt_SE = zeros(2,5);
+        CIs_CC = zeros(2,10);
+        CIs_SE = zeros(2,10);
+
+        for a = 1:2
+            % For all ages
+            AvAnnualDeathsUK(a,1:3) = [sum(ResultsPast{a}(:,3)), sum(ResultsPast{a}(:,6)), sum(ResultsPast{a}(:,7))]; % Near Past
+            AvAnnualDeathsUK(a,4:6) = [sum(Results_1_5C_CC{a}(:,3)), sum(Results_1_5C_CC{a}(:,6)), sum(Results_1_5C_CC{a}(:,7))]; % 1.5 degree
+            AvAnnualDeathsUK(a,7:9) = [sum(Results_2C_CC{a}(:,3)), sum(Results_2C_CC{a}(:,6)), sum(Results_2C_CC{a}(:,7))]; % 2 degree C
+            AvAnnualDeathsUK(a,10:12) = [sum(Results_3C_CC{a}(:,3)), sum(Results_3C_CC{a}(:,6)), sum(Results_3C_CC{a}(:,7))]; % 3 degree C
+            AvAnnualDeathsUK(a,13:15) = [sum(Results_4C_CC{a}(:,3)), sum(Results_4C_CC{a}(:,6)), sum(Results_4C_CC{a}(:,7))]; % 4 degree C
+            
+            AvAnnualDeathsUK_SE(a,1:3) = [sum(ResultsPast{a}(:,3)), sum(ResultsPast{a}(:,6)), sum(ResultsPast{a}(:,7))];% Near Past (population same in both scenarios)
+            AvAnnualDeathsUK_SE(a,4:6) = [sum(Results_1_5C_SE{a}(:,3)), sum(Results_1_5C_SE{a}(:,6)), sum(Results_1_5C_SE{a}(:,7))]; % 1.5 degree CC+SE
+            AvAnnualDeathsUK_SE(a,7:9) = [sum(Results_2C_SE{a}(:,3)), sum(Results_2C_SE{a}(:,6)), sum(Results_2C_SE{a}(:,7))]; %2 degree C CC+SE
+            AvAnnualDeathsUK_SE(a,10:12) = [sum(Results_3C_SE{a}(:,3)), sum(Results_3C_SE{a}(:,6)), sum(Results_3C_SE{a}(:,7))]; % 3 degree C CC+SE
+            AvAnnualDeathsUK_SE(a,13:15) = [sum(Results_4C_SE{a}(:,3)), sum(Results_4C_SE{a}(:,6)), sum(Results_4C_SE{a}(:,7))]; % 4 degree C CC+SE
+
+            CIs_CC(a, 1:2) = [sum(ResultsPast{a}(:,3))- annualMortalityUK_CIs{a}(1,1),annualMortalityUK_CIs{1}(1,2)- sum(ResultsPast{a}(:,3))]; 
+            CIs_CC(a, 3:4) = [sum(Results_1_5C_CC{a}(:,3))- annualMortalityUK_CIs_1_5_CC{a}(1,1),annualMortalityUK_CIs_1_5_CC{a}(1,2)- sum(Results_1_5C_CC{a}(:,3))]; 
+            CIs_CC(a, 5:6) = [sum(Results_2C_CC{a}(:,3))- annualMortalityUK_CIs_2_CC{a}(1,1),annualMortalityUK_CIs_2_CC{a}(1,2)- sum(Results_2C_CC{a}(:,3))]; 
+            CIs_CC(a, 7:8) = [sum(Results_3C_CC{a}(:,3))- annualMortalityUK_CIs_3_CC{a}(1,1),annualMortalityUK_CIs_3_CC{a}(1,2)- sum(Results_3C_CC{a}(:,3))]; 
+            CIs_CC(a, 9:10) = [sum(Results_4C_CC{a}(:,3))- annualMortalityUK_CIs_4_CC{a}(1,1),annualMortalityUK_CIs_4_CC{a}(1,2)- sum(Results_4C_CC{a}(:,3))]; 
+            
+            CIs_SE(a, 1:2) = [sum(ResultsPast{a}(:,3))- annualMortalityUK_CIs{a}(1,1),annualMortalityUK_CIs{1}(1,2)- sum(ResultsPast{a}(:,3))]; 
+            CIs_SE(a, 3:4) = [sum(Results_1_5C_SE{a}(:,3))- annualMortalityUK_CIs_1_5_SE{a}(1,1),annualMortalityUK_CIs_1_5_SE{a}(1,2)- sum(Results_1_5C_SE{a}(:,3))]; 
+            CIs_SE(a, 5:6) = [sum(Results_2C_SE{a}(:,3))- annualMortalityUK_CIs_2_SE{a}(1,1),annualMortalityUK_CIs_2_SE{a}(1,2)- sum(Results_2C_SE{a}(:,3))]; 
+            CIs_SE(a, 7:8) = [sum(Results_3C_SE{a}(:,3))- annualMortalityUK_CIs_3_SE{a}(1,1),annualMortalityUK_CIs_3_SE{a}(1,2)- sum(Results_3C_SE{a}(:,3))]; 
+            CIs_SE(a, 9:10) = [sum(Results_4C_SE{a}(:,3))- annualMortalityUK_CIs_4_SE{a}(1,1),annualMortalityUK_CIs_4_SE{a}(1,2)- sum(Results_4C_SE{a}(:,3))]; 
+        end
+
+            %difference between NO adaptation and WITH adaptation strategies for stacked
+            %plot (rows = adapt scenarios, columns = time-periods).
+            AvAnnualDeathsAdapt(1,1:5) = [sum(ResultsPast{2}(:,3)), sum(Results_1_5C_CC{2}(:,3)), sum(Results_2C_CC{2}(:,3)), sum(Results_3C_CC{2}(:,3)), sum(Results_4C_CC{2}(:,3))];
+            AvAnnualDeathsAdapt(2,1:5) = [sum(ResultsPast{1}(:,3))- sum(ResultsPast{2}(:,3)), sum(Results_1_5C_CC{1}(:,3))-sum(Results_1_5C_CC{2}(:,3)), sum(Results_2C_CC{1}(:,3))-sum(Results_2C_CC{2}(:,3)), sum(Results_3C_CC{1}(:,3)) - sum(Results_3C_CC{2}(:,3)), sum(Results_4C_CC{1}(:,3)) - sum(Results_4C_CC{2}(:,3))]; 
+            AvAnnualDeathsAdapt_SE(1,1:5) = [sum(ResultsPast{2}(:,3)), sum(Results_1_5C_SE{2}(:,3)), sum(Results_2C_SE{2}(:,3)), sum(Results_3C_SE{2}(:,3)),sum(Results_4C_SE{2}(:,3))];
+            AvAnnualDeathsAdapt_SE(2,1:5) = [sum(ResultsPast{1}(:,3))-sum(ResultsPast{2}(:,3)), sum(Results_1_5C_SE{1}(:,3))-sum(Results_1_5C_SE{2}(:,3)), sum(Results_2C_SE{1}(:,3))-sum(Results_2C_SE{2}(:,3)), sum(Results_3C_SE{1}(:,3))-sum(Results_3C_SE{2}(:,3)), sum(Results_4C_SE{1}(:,3))-sum(Results_4C_SE{2}(:,3))];
+
+            %% PLOTS
+            % Create some initial output figures
+
+            %1. Average annual deaths for each scenario (All ages) CC-only and CC+SE
+
+            figure;
+            M = max(AvAnnualDeathsUK_SE(1,:)*1.1); %set y axis max limit across sub-plots
+            x=1:5;
+            subplot(1,2,1);
+
+            % Create bar and set individual colours
+            b = bar(AvAnnualDeathsUK(1,[1,4,7,10,13]), 'FaceColor',[0.850980401039124 0.325490206480026 0.0980392172932625]);
+            b.FaceColor = 'flat';
+            b.CData(1,:) = [1 0.843137264251709 0];
+            b.CData(2,:) = [0.87058824300766 0.490196079015732 0];
+            b.CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b.CData(4,:) = [0.600000023841858 0.200000002980232 0];
+            b.CData(5,:) = [0.40,0.00,0.00];
+
+            hold on
+            p_errhigh =  CIs_CC(1,[2,4,6,8,10]); %90th p - average
+            p_errlow =  CIs_CC(1,[1,3,5,7,9]); % average - 10th p)
+            %p_errhigh = AvAnnualDeathsUK(1,[3,6,9,12,15])- AvAnnualDeathsUK(1,[1,4,7,10,13]); %90th p - average
+            %p_errlow = AvAnnualDeathsUK(1,[1,4,7,10,13])-AvAnnualDeathsUK(1,[2,5,8,11,14]); % average - 10th p)
+
+            er = errorbar(x, AvAnnualDeathsUK(1,[1,4,7,10,13]), p_errlow, p_errhigh, 'LineWidth',1); %CI95%
+            er.Color = [0 0 0];                            
+            er.LineStyle = 'none';
+
+            % Create ylabel
+            ylabel('Average Annual Heat Related Deaths');
+
+            % Create xlabel
+            xlabel('Climate Scenario');
+
+            % Create title
+            title('Climate Change Only');
+
+            % Set the remaining axes properties
+            set (gca, 'ylim', [0 M]);
+            set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'Past','1.5','2.0','3.0','4.0'},'YGrid',...
+                'on');
+            ax = gca;
+            ax.YAxis.Exponent = 0;
+
+            subplot(1,2,2);
+            % Create bar
+            b= bar(AvAnnualDeathsUK_SE(1,[1,4,7,10,13]), 'FaceColor',[0.850980401039124 0.325490206480026 0.0980392172932625]);
+            b.FaceColor = 'flat';
+            b.CData(1,:) = [1 0.843137264251709 0];
+            b.CData(2,:) = [0.87058824300766 0.490196079015732 0];
+            b.CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b.CData(4,:) = [0.600000023841858 0.200000002980232 0];
+            b.CData(5,:) = [0.40,0.00,0.00];
+
+            hold on
+            p_errhighSE =  CIs_SE(1,[2,4,6,8,10]); %90th p - average
+            p_errlowSE =  CIs_SE(1,[1,3,5,7,9]); % average - 10th p)
 %             p_errhighSE = AvAnnualDeathsUK_SE(1,[3,6,9,12,15])- AvAnnualDeathsUK_SE(1,[1,4,7,10,13]); %90th p - average
 %             p_errlowSE = AvAnnualDeathsUK_SE(1,[1,4,7,10,13])-AvAnnualDeathsUK_SE(1,[2,5,8,11,14]); % average - 10th p)
-% 
-%             er = errorbar(x, AvAnnualDeathsUK_SE(1,[1,4,7,10,13]), p_errlowSE, p_errhighSE, 'LineWidth',1);    
-%             er.Color = [0 0 0];                            
-%             er.LineStyle = 'none';
-% 
-%             % Create ylabel
-%             %ylabel('Average Annual Heat Related Deaths');
-% 
-%             % Create xlabel
-%             xlabel('Climate Scenario');
-% 
-%             % Create title
-%             title('Climate and Population Change');
-% 
-%             % Set the remaining axes properties
-%             set (gca, 'ylim', [0 M])
-%             set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'Past','1.5','2.0','3.0','4.0'},'YGrid',...
-%                 'on');
-%             ax = gca;
-%             ax.YAxis.Exponent = 0;
-% 
-%            
+
+            er = errorbar(x, AvAnnualDeathsUK_SE(1,[1,4,7,10,13]), p_errlowSE, p_errhighSE, 'LineWidth',1);    
+            er.Color = [0 0 0];                            
+            er.LineStyle = 'none';
+
+            % Create ylabel
+            %ylabel('Average Annual Heat Related Deaths');
+
+            % Create xlabel
+            xlabel('Climate Scenario');
+
+            % Create title
+            title('Climate and Population Change');
+
+            % Set the remaining axes properties
+            set (gca, 'ylim', [0 M])
+            set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'Past','1.5','2.0','3.0','4.0'},'YGrid',...
+                'on');
+            ax = gca;
+            ax.YAxis.Exponent = 0;
+
+           
 %             %% 2 versus 4 degree for paper
 %             
 %             %twovsfour
@@ -1431,286 +1710,313 @@ end
 % 
 %             % Set the remaining axes properties
 %             %set (gca, 'ylim', [0 M]);
-%             set(gca,'XTick',[1 2 3],'XTickLabel',{'2.0 2050','2.0 2100','4.0 2100'},'YGrid',...
+%             set(gca,'XTick',[1 2 3],'XTickLabel',{'2.0 2050','2.0 2080','4.0 2080'},'YGrid',...
 %                 'on');
 %             ax = gca;
 %             ax.YAxis.Exponent = 0;
-%             
-%                        
-%             %% Clustered bars per age group, climate scenario (cc only)
-%             % Per 100,000 population
-% 
-%             AvAgeResults = zeros(nClimScen, ageGroupCnt-1); %ignore all ages.
-%             AvAgeResults_10percentile = zeros(nClimScen, ageGroupCnt-1);
-%             AvAgeResults_90percentile = zeros(nClimScen, ageGroupCnt-1);
-% 
-%             AvAgeResults(1,:) = ResultsPastAgeGroup{1}(2:5,1);
-%             AvAgeResults(2,:) = Results_1_5C_AgeGroup_CC{1}(2:5,1);
-%             AvAgeResults(3,:) = Results_2C_AgeGroup_CC{1}(2:5,1);
-%             AvAgeResults(4,:) = Results_3C_AgeGroup_CC{1}(2:5,1);
-% 
-%             AvAgeResults_10percentile(1,:) = ResultsPastAgeGroup{1}(2:5,2);
-%             AvAgeResults_10percentile(2,:) = Results_1_5C_AgeGroup_CC{1}(2:5,2); 
-%             AvAgeResults_10percentile(3,:) = Results_2C_AgeGroup_CC{1}(2:5,2); 
-%             AvAgeResults_10percentile(4,:) = Results_3C_AgeGroup_CC{1}(2:5,2);
-% 
-%             AvAgeResults_90percentile(1,:) = ResultsPastAgeGroup{1}(2:5,3);
-%             AvAgeResults_90percentile(2,:) = Results_1_5C_AgeGroup_CC{1}(2:5,3); 
-%             AvAgeResults_90percentile(3,:) = Results_2C_AgeGroup_CC{1}(2:5,3); 
-%             AvAgeResults_90percentile(4,:) = Results_3C_AgeGroup_CC{1}(2:5,3); 
-% 
-%             AvAgeResults = AvAgeResults.'; %Transpose for clustered bar
-%             AvAgeResults_10percentile = AvAgeResults_10percentile.';
-%             AvAgeResults_90percentile = AvAgeResults_90percentile.';
-% 
-%             M = max(AvAgeResults_90percentile(:,4)*1.1); %set y axis max limit across sub-plots
-%             figure
-% 
-%             b = bar(AvAgeResults, 'FaceColor', 'flat');
-%             b(1).CData(1,:) = [1 0.843137264251709 0];
-%             b(2).CData(1,:) = [0.87058824300766 0.490196079015732 0];
-%             b(3).CData(1,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(4).CData(1,:) = [0.600000023841858 0.200000002980232 0];
-%             b(1).CData(2,:) = [1 0.843137264251709 0];
-%             b(2).CData(2,:) = [0.87058824300766 0.490196079015732 0];
-%             b(3).CData(2,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(4).CData(2,:) = [0.600000023841858 0.200000002980232 0];
-%             b(1).CData(3,:) = [1 0.843137264251709 0];
-%             b(2).CData(3,:) = [0.87058824300766 0.490196079015732 0];
-%             b(3).CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(4).CData(3,:) = [0.600000023841858 0.200000002980232 0];
-%             b(1).CData(4,:) = [1 0.843137264251709 0];
-%             b(2).CData(4,:) = [0.87058824300766 0.490196079015732 0];
-%             b(3).CData(4,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(4).CData(4,:) = [0.600000023841858 0.200000002980232 0];
-% 
-%             hold on
-%             p_errhigh = AvAgeResults_90percentile - AvAgeResults; %90th p - average
-%             p_errlow = AvAgeResults - AvAgeResults_10percentile; % average - 10th p)
-% 
-%             % Calculate the number of groups and number of bars in each group
-%             [ngroups,nbars] = size(AvAgeResults);
-%             % Get the x coordinate of the bars
-%             x = nan(nbars, ngroups);
-%             for i = 1:nbars
-%                 x(i,:) = b(i).XEndPoints;
-%             end
-% 
-%             er = errorbar(x', AvAgeResults, p_errlow, p_errhigh, 'k', 'LineWidth',1,'linestyle','none');                                
-% 
-%             % Create ylabel
-%             ylabel('Average Annual Heat Related Deaths per 100,000 population');
-% 
-%             % Create xlabel
-%             xlabel('Age Group');
-%             %create title
-%             title ('Climate Change Only')
-% 
-%             set (gca, 'ylim', [0 M])
-%             set(gca,'XTick',[1 2 3 4],'XTickLabel',{'0-64', '65-74', '75-84','85+'},'YGrid',...
-%                 'on');
-% 
-%             %%%
-%             %% Clustered bars per age group, climate scenario (cc and SE)
-%             % Per 100,000 population
-% 
-%             AvAgeResultsSE = zeros(nClimScen, ageGroupCnt-1); %ignore all ages.
-%             AvAgeResults_10percetileSE = zeros(nClimScen, ageGroupCnt-1);
-%             AvAgeResults_90percetileSE = zeros(nClimScen, ageGroupCnt-1);
-% 
-%             AvAgeResultsSE(1,:) = ResultsPastAgeGroup{1}(:,1);
-%             AvAgeResultsSE(2,:) = Results_1_5C_AgeGroup_SE{1}(:,1);
-%             AvAgeResultsSE(3,:) = Results_2C_AgeGroup_SE{1}(:,1);
-%             AvAgeResultsSE(4,:) = Results_3C_AgeGroup_SE{1}(:,1);
-%             AvAgeResultsSE(5,:) = Results_4C_AgeGroup_SE{1}(:,1);
-% 
-%             AvAgeResults_10percentileSE(1,:) = ResultsPastAgeGroup{1}(:,2); 
-%             AvAgeResults_10percentileSE(2,:) = Results_1_5C_AgeGroup_SE{1}(:,2); 
-%             AvAgeResults_10percentileSE(3,:) = Results_2C_AgeGroup_SE{1}(:,2); 
-%             AvAgeResults_10percentileSE(4,:) = Results_3C_AgeGroup_SE{1}(:,2);
-%             AvAgeResults_10percentileSE(5,:) = Results_4C_AgeGroup_SE{1}(:,2);
-% 
-%             AvAgeResults_90percentileSE(1,:) = ResultsPastAgeGroup{1}(:,3); 
-%             AvAgeResults_90percentileSE(2,:) = Results_1_5C_AgeGroup_SE{1}(:,3); 
-%             AvAgeResults_90percentileSE(3,:) = Results_2C_AgeGroup_SE{1}(:,3); 
-%             AvAgeResults_90percentileSE(4,:) = Results_3C_AgeGroup_SE{1}(:,3);
-%             AvAgeResults_90percentileSE(5,:) = Results_4C_AgeGroup_SE{1}(:,3);
-%             
-%             AvAgeResultsSE = AvAgeResultsSE.'; %Transpose for clustered bar
-%             AvAgeResults_10percentileSE = AvAgeResults_10percentileSE.';
-%             AvAgeResults_90percentileSE = AvAgeResults_90percentileSE.';
-% 
-%             M = max(AvAgeResults_90percentileSE(:,5)*1.1); %set y axis max limit across sub-plots
-% 
-%             figure
-%             b = bar(AvAgeResultsSE, 'FaceColor', 'flat');
-%             b(1).CData(1,:) = [1 0.843137264251709 0];
-%             b(2).CData(1,:) = [0.87058824300766 0.490196079015732 0];
-%             b(3).CData(1,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(4).CData(1,:) = [0.600000023841858 0.200000002980232 0];
-%             b(5).CData(1,:) = [0.40,0.00,0.00];
-%             b(1).CData(2,:) = [1 0.843137264251709 0];
-%             b(2).CData(2,:) = [0.87058824300766 0.490196079015732 0];
-%             b(3).CData(2,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(4).CData(2,:) = [0.600000023841858 0.200000002980232 0];
-%             b(5).CData(2,:) = [0.40,0.00,0.00];
-%             b(1).CData(3,:) = [1 0.843137264251709 0];
-%             b(2).CData(3,:) = [0.87058824300766 0.490196079015732 0];
-%             b(3).CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(4).CData(3,:) = [0.600000023841858 0.200000002980232 0];
-%             b(5).CData(3,:) = [0.40,0.00,0.00];
-%             b(1).CData(4,:) = [1 0.843137264251709 0];
-%             b(2).CData(4,:) = [0.87058824300766 0.490196079015732 0];
-%             b(3).CData(4,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(4).CData(4,:) = [0.600000023841858 0.200000002980232 0];
-%             b(5).CData(4,:) = [0.40,0.00,0.00];
-%             hold on
-%             
-%             p_errhigh = AvAgeResults_90percentileSE - AvAgeResultsSE; %90th p - average
-%             p_errlow = AvAgeResultsSE - AvAgeResults_10percentileSE; % average - 10th p)
-% 
-%             % Calculate the number of groups and number of bars in each group
-%             [ngroups,nbars] = size(AvAgeResultsSE);
-%             % Get the x coordinate of the bars
-%             x = nan(nbars, ngroups);
-%             for i = 1:nbars
-%                 x(i,:) = b(i).XEndPoints;
-%             end
-% 
-%             er = errorbar(x', AvAgeResultsSE, p_errlow, p_errhigh, 'k', 'LineWidth',1,'linestyle','none');                                
-% 
-%             % Create ylabel
-%             ylabel('Average Annual Heat Related Deaths per 100,000 population');
-% 
-% 
-%             % Create xlabel
-%             xlabel('Age Group');
-%             %create title
-%             title ('Climate and Population Change')
-% 
-% 
-%             set (gca, 'ylim', [0 M])
-%             set(gca,'XTick',[1 2 3 4],'XTickLabel',{'0-64', '65-74', '75-84','85+'},'YGrid',...
-%                 'on');
-% 
-%             %% clustered bar - mortality per each 1 degree increment for each scenario
-%             load('avMortPerIncrementUK')
-% 
-%             figure
-%             subplot(2,1,1);
-% 
-%             avMortPerIncrementUK_0dp = round(avMortPerIncrementUK); % round to nearest integer
-%             M = max(avMortPerIncrementUK_0dp(10,:)*1.1); %set y axis max limit across sub-plots
-% 
-%             b = bar(avMortPerIncrementUK_0dp([2:3, 5, 7, 9],1:16).');
-%             set(b(1),'FaceColor',[1 0.843137264251709 0]);
-%             set(b(2),'FaceColor',[0.87058824300766 0.490196079015732 0]);
-%             set(b(3),'FaceColor',[0.850980401039124 0.325490206480026 0.0980392172932625]);
-%             set(b(4),'FaceColor',[0.600000023841858 0.200000002980232 0]);
-%             set(b(5),'FaceColor',[0.40,0.00,0.00]);
-% 
-% 
-%             % Create ylabel
-%             ylabel('Average Annual Heat Related Deaths');
-% 
-%             % Create xlabel
-%             xlabel('Degrees warming above regional thresholds');
-%             %create title
-%             title ('Climate Change Only')
-%             set (gca, 'ylim', [0 M])
-% 
-% 
-%             subplot(2,1,2);
-%             b = bar(avMortPerIncrementUK_0dp([2,4, 6, 8, 10],1:16).');
-%             set(b(1),'FaceColor',[1 0.843137264251709 0]);
-%             set(b(2),'FaceColor',[0.87058824300766 0.490196079015732 0]);
-%             set(b(3),'FaceColor',[0.850980401039124 0.325490206480026 0.0980392172932625]);
-%             set(b(4),'FaceColor',[0.600000023841858 0.200000002980232 0]);
-%             set(b(5),'FaceColor',[0.40,0.00,0.00]);
-%             hold on
-%             labels = {'Past','1.5','2.0','3.0', '4.0'};
-%             legend(labels);
-% 
-%             % Create ylabel
-%             ylabel('Average Annual Heat Related Deaths');
-%             xlabel('Degrees warming above regional thresholds');
-%             %create title
-%             title ('Climate and Population Change')
-%             set (gca, 'ylim', [0 M])
-% 
-%             %% Plots for Adaptation (scenarios for natural acclimatisation - 93rd Percentile or 1 & 2 degree threshold)
-%             figure;
-%             subplot(1,2,1);
-%             b= bar (AvAnnualDeathsAdapt.', 'stacked', 'FaceColor','flat');
-% 
-%             %colours for adapt thresholds no adaptation and adapScen.
-%             b(2).CData(1,:) = [0.87058824300766 0.490196079015732 0];
-%             b(1).CData(1,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             b(1).CData(2,:) = [0.87058824300766 0.490196079015732 0];
-%             b(2).CData(2,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             b(1).CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(2).CData(3,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             b(1).CData(4,:) = [0.600000023841858 0.200000002980232 0];
-%             b(2).CData(4,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             b(1).CData(5,:) = [0.600000023841858 0.200000002980232 0];
-%             b(2).CData(5,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             hold on
-% 
-%             M = AvAnnualDeathsUK_SE(1,13)*1.3; %set y axis max limit across sub-plots
-%             % Create ylabel
-%             ylabel('Average Annual Heat Related Deaths');
-% 
-%             % Create xlabel
-%             xlabel('Climate Scenario');
-% 
-%             % Create title
-%             title('Climate Change Only');
-% 
-%              labels = {'No Adaptation','Adaptation'};
-%              legend(labels);
-%              set(legend,...
-%                  'Position',[0.157187955560562 0.762734641133266 0.276785708750997 0.13589211247274]);
-% 
-%             % Set the remaining axes properties
-%             set (gca, 'ylim', [0 M])
-%             set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'Past','1.5','2.0','3.0', '4.0'},'YGrid',...
-%                 'on');
-% 
-%             subplot(1,2,2);
-%             b=bar (AvAnnualDeathsAdapt_SE.', 'stacked', 'FaceColor','flat');     
-% 
-%             b(2).CData(1,:) = [0.87058824300766 0.490196079015732 0];
-%             b(1).CData(1,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             b(1).CData(2,:) = [0.87058824300766 0.490196079015732 0];
-%             b(2).CData(2,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             b(1).CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
-%             b(2).CData(3,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             b(1).CData(4,:) = [0.600000023841858 0.200000002980232 0];
-%             b(2).CData(4,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             b(1).CData(5,:) = [0.600000023841858 0.200000002980232 0];
-%             b(2).CData(5,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
-%             hold on
-% 
-%             % Create ylabel
-%             ylabel('Average Annual Heat Related Deaths');
-% 
-%             % Create xlabel
-%             xlabel('Climate Scenario');
-% 
-%             % Create title
-%             title('Climate and Population Change');
-% 
-%             % Set the remaining axes properties
-%             set (gca, 'ylim', [0 M])
-%             set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'Past','1.5','2.0','3.0', '4.0'},'YGrid',...
-%                 'on');
+            
+                       
+            %% Clustered bars per age group, climate scenario (cc only)
+            % Per 100,000 population
+            %%NOT USED IN PAPER
 
-            %% adaptation comparison
+            AvAgeResults = zeros(nClimScen, ageGroupCnt); %ignore all ages.
+            %AvAgeResults_10percentile = zeros(nClimScen, ageGroupCnt);
+            %AvAgeResults_90percentile = zeros(nClimScen, ageGroupCnt);
+            AvAgeResults_95CI_low = zeros(nClimScen, ageGroupCnt);
+            AvAgeResults_95CI_high = zeros(nClimScen, ageGroupCnt);
+
+            AvAgeResults(1,:) = ResultsPastAgeGroup{1}(1:5,1);
+            AvAgeResults(2,:) = Results_1_5C_AgeGroup_CC{1}(1:5,1);
+            AvAgeResults(3,:) = Results_2C_AgeGroup_CC{1}(1:5,1);
+            AvAgeResults(4,:) = Results_3C_AgeGroup_CC{1}(1:5,1);
+            AvAgeResults(5,:) = Results_3C_AgeGroup_CC{1}(1:5,1);
+
+            AvAgeResults_95CI_low(1,:) = ResultsPastAgeGroup{1}(1:5,4);
+            AvAgeResults_95CI_low(2,:) = Results_1_5C_AgeGroup_CC{1}(1:5,4); 
+            AvAgeResults_95CI_low(3,:) = Results_2C_AgeGroup_CC{1}(1:5,4); 
+            AvAgeResults_95CI_low(4,:) = Results_3C_AgeGroup_CC{1}(1:5,4);
+            AvAgeResults_95CI_low(5,:) = Results_3C_AgeGroup_CC{1}(1:5,4);
+
+            AvAgeResults_95CI_high(1,:) = ResultsPastAgeGroup{1}(1:5,5);
+            AvAgeResults_95CI_high(2,:) = Results_1_5C_AgeGroup_CC{1}(1:5,5); 
+            AvAgeResults_95CI_high(3,:) = Results_2C_AgeGroup_CC{1}(1:5,5); 
+            AvAgeResults_95CI_high(4,:) = Results_3C_AgeGroup_CC{1}(1:5,5); 
+            AvAgeResults_95CI_high(5,:) = Results_3C_AgeGroup_CC{1}(1:5,5); 
+
+            AvAgeResults = AvAgeResults.'; %Transpose for clustered bar
+            AvAgeResults_95CI_low = AvAgeResults_95CI_low.';
+            AvAgeResults_95CI_high = AvAgeResults_95CI_high.';
+
+            M = max(AvAgeResults_95CI_high(:,5)*1.1); %set y axis max limit across sub-plots
+            figure
+
+            b = bar(AvAgeResults, 'FaceColor', 'flat');
+            b(1).CData(1,:) = [1 0.843137264251709 0];
+            b(2).CData(1,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(1,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(1,:) = [0.600000023841858 0.200000002980232 0];
+            b(1).CData(2,:) = [1 0.843137264251709 0];
+            b(2).CData(2,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(2,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(2,:) = [0.600000023841858 0.200000002980232 0];
+            b(1).CData(3,:) = [1 0.843137264251709 0];
+            b(2).CData(3,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(3,:) = [0.600000023841858 0.200000002980232 0];
+            b(1).CData(4,:) = [1 0.843137264251709 0];
+            b(2).CData(4,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(4,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(4,:) = [0.600000023841858 0.200000002980232 0];
+            
+
+            hold on
+            p_errhigh = AvAgeResults_95CI_high - AvAgeResults; %90th p - average
+            p_errlow = AvAgeResults - AvAgeResults_95CI_low; % average - 10th p)
+
+            % Calculate the number of groups and number of bars in each group
+            [ngroups,nbars] = size(AvAgeResults);
+            % Get the x coordinate of the bars
+            x = nan(nbars, ngroups);
+            for i = 1:nbars
+                x(i,:) = b(i).XEndPoints;
+            end
+
+            er = errorbar(x', AvAgeResults, p_errlow, p_errhigh, 'k', 'LineWidth',1,'linestyle','none');                                
+
+            % Create ylabel
+            ylabel('Average Annual Heat Related Deaths per 100,000 population');
+
+            % Create xlabel
+            xlabel('Age Group');
+            %create title
+            title ('Climate Change Only')
+
+            set (gca, 'ylim', [0 M])
+            set(gca,'XTick',[1 2 3 4],'XTickLabel',{'0-64', '65-74', '75-84','85+'},'YGrid',...
+                'on');
+
+            %%%
+            %% Clustered bars per age group, climate scenario (cc and SE)
+            % Per 100,000 population
+
+            AvAgeResultsSE = zeros(nClimScen, ageGroupCnt); %ignore all ages.
+            %AvAgeResults_10percetileSE = zeros(nClimScen, ageGroupCnt-1);
+            %AvAgeResults_90percetileSE = zeros(nClimScen, ageGroupCnt-1);
+            AvAgeResults_95CI_lowSE = zeros(nClimScen, ageGroupCnt);
+            AvAgeResults_95CI_highSE = zeros(nClimScen, ageGroupCnt);
+
+            AvAgeResultsSE(1,:) = ResultsPastAgeGroup{1}(:,1);
+            AvAgeResultsSE(2,:) = Results_1_5C_AgeGroup_SE{1}(:,1);
+            AvAgeResultsSE(3,:) = Results_2C_AgeGroup_SE{1}(:,1);
+            AvAgeResultsSE(4,:) = Results_3C_AgeGroup_SE{1}(:,1);
+            AvAgeResultsSE(5,:) = Results_4C_AgeGroup_SE{1}(:,1);
+
+            AvAgeResults_95CI_lowSE(1,:) = ResultsPastAgeGroup{1}(:,4); 
+            AvAgeResults_95CI_lowSE(2,:) = Results_1_5C_AgeGroup_SE{1}(:,4); 
+            AvAgeResults_95CI_lowSE(3,:) = Results_2C_AgeGroup_SE{1}(:,4); 
+            AvAgeResults_95CI_lowSE(4,:) = Results_3C_AgeGroup_SE{1}(:,4);
+            AvAgeResults_95CI_lowSE(5,:) = Results_4C_AgeGroup_SE{1}(:,4);
+
+            AvAgeResults_95CI_highSE(1,:) = ResultsPastAgeGroup{1}(:,5); 
+            AvAgeResults_95CI_highSE(2,:) = Results_1_5C_AgeGroup_SE{1}(:,5); 
+            AvAgeResults_95CI_highSE(3,:) = Results_2C_AgeGroup_SE{1}(:,5); 
+            AvAgeResults_95CI_highSE(4,:) = Results_3C_AgeGroup_SE{1}(:,5);
+            AvAgeResults_95CI_highSE(5,:) = Results_4C_AgeGroup_SE{1}(:,5);
+            
+            AvAgeResultsSE = AvAgeResultsSE.'; %Transpose for clustered bar
+            AvAgeResults_95CI_lowSE = AvAgeResults_95CI_lowSE.';
+            AvAgeResults_95CI_highSE = AvAgeResults_95CI_highSE.';
+
+            M = max(AvAgeResults_95CI_highSE(:,5)*1.1); %set y axis max limit across sub-plots
+
+            figure
+            b = bar(AvAgeResultsSE, 'FaceColor', 'flat');
+            b(1).CData(1,:) = [1 0.843137264251709 0];
+            b(2).CData(1,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(1,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(1,:) = [0.600000023841858 0.200000002980232 0];
+            b(5).CData(1,:) = [0.40,0.00,0.00];
+            b(1).CData(2,:) = [1 0.843137264251709 0];
+            b(2).CData(2,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(2,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(2,:) = [0.600000023841858 0.200000002980232 0];
+            b(5).CData(2,:) = [0.40,0.00,0.00];
+            b(1).CData(3,:) = [1 0.843137264251709 0];
+            b(2).CData(3,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(3,:) = [0.600000023841858 0.200000002980232 0];
+            b(5).CData(3,:) = [0.40,0.00,0.00];
+            b(1).CData(4,:) = [1 0.843137264251709 0];
+            b(2).CData(4,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(4,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(4,:) = [0.600000023841858 0.200000002980232 0];
+            b(5).CData(4,:) = [0.40,0.00,0.00];
+            b(1).CData(5,:) = [1 0.843137264251709 0];
+            b(2).CData(5,:) = [0.87058824300766 0.490196079015732 0];
+            b(3).CData(5,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(4).CData(5,:) = [0.600000023841858 0.200000002980232 0];
+            b(5).CData(5,:) = [0.40,0.00,0.00];
+            
+            hold on
+            
+            p_errhigh = AvAgeResults_95CI_highSE - AvAgeResultsSE; %90th p - average
+            p_errlow = AvAgeResultsSE - AvAgeResults_95CI_lowSE; % average - 10th p)
+
+            % Calculate the number of groups and number of bars in each group
+            [ngroups,nbars] = size(AvAgeResultsSE);
+            % Get the x coordinate of the bars
+            x = nan(nbars, ngroups);
+            for i = 1:nbars
+                x(i,:) = b(i).XEndPoints;
+            end
+
+            er = errorbar(x', AvAgeResultsSE, p_errlow, p_errhigh, 'k', 'LineWidth',1,'linestyle','none');                                
+
+            % Create ylabel
+            ylabel('Average Annual Heat Related Deaths per 100,000 population');
+
+
+            % Create xlabel
+            xlabel('Age Group');
+            %create title
+            title ('Climate and Population Change')
+
+
+            set (gca, 'ylim', [0 M])
+            set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'All Ages', '0-64', '65-74', '75-84','85+'},'YGrid',...
+                'on');
+
+            %% clustered bar - mortality per each 1 degree increment for each scenario
+            load('avMortPerIncrementUK')
+
+            figure
+            subplot(2,1,1);
+
+            avMortPerIncrementUK_0dp = round(avMortPerIncrementUK); % round to nearest integer
+            M = 3250; %max(avMortPerIncrementUK_CI_high(10,:)*1.1); %set y axis max limit across sub-plots
+            p_errlow = round(avMortPerIncrementUK_CI_low([2,7,8,9,10], 1:16).');
+            p_errhigh = round(avMortPerIncrementUK_CI_high([2,7,8,9,10], 1:16).');
+
+            b = bar(avMortPerIncrementUK_0dp([2:3, 5, 7, 9],1:16).');
+            set(b(1),'FaceColor',[1 0.843137264251709 0]);
+            set(b(2),'FaceColor',[0.87058824300766 0.490196079015732 0]);
+            set(b(3),'FaceColor',[0.850980401039124 0.325490206480026 0.0980392172932625]);
+            set(b(4),'FaceColor',[0.600000023841858 0.200000002980232 0]);
+            set(b(5),'FaceColor',[0.40,0.00,0.00]);
+
+
+            % Create ylabel
+            ylabel('Average Annual Heat Related Deaths');
+
+            % Create xlabel
+            xlabel('Degrees warming above regional thresholds');
+            %create title
+            title ('Climate Change Only')
+            set (gca, 'ylim', [0 M])
+
+
+            subplot(2,1,2);
+            b = bar(avMortPerIncrementUK_0dp([2,4, 6, 8, 10],1:16).');
+            set(b(1),'FaceColor',[1 0.843137264251709 0]);
+            set(b(2),'FaceColor',[0.87058824300766 0.490196079015732 0]);
+            set(b(3),'FaceColor',[0.850980401039124 0.325490206480026 0.0980392172932625]);
+            set(b(4),'FaceColor',[0.600000023841858 0.200000002980232 0]);
+            set(b(5),'FaceColor',[0.40,0.00,0.00]);
+            hold on
+            labels = {'Past','1.5','2.0','3.0', '4.0'};
+            legend(labels);
+                    
+            % Calculate the number of groups and number of bars in each group
+            [ngroups,nbars] = size(p_errlow);
+            % Get the x coordinate of the bars
+            x = nan(nbars, ngroups);
+            for i = 1:nbars
+                x(i,:) = b(i).XEndPoints;
+            end
+            
+            er = errorbar(x.', avMortPerIncrementUK_0dp([2,4, 6, 8, 10],1:16).', p_errlow, p_errhigh, 'k', 'LineWidth',1,'linestyle','none'); 
+
+            % Create ylabel
+            ylabel('Average Annual Heat Related Deaths');
+            xlabel('Degrees warming above regional thresholds');
+            %create title
+            title ('Climate and Population Change')
+            set (gca, 'ylim', [0 M])
+
+            %% Plots for Adaptation (scenarios for natural acclimatisation - 93rd Percentile or 1 & 2 degree threshold)
+            figure;
+            subplot(1,2,1);
+            b= bar (AvAnnualDeathsAdapt.', 'stacked', 'FaceColor','flat');
+
+            %colours for adapt thresholds no adaptation and adapScen.
+            b(2).CData(1,:) = [0.87058824300766 0.490196079015732 0];
+            b(1).CData(1,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            b(1).CData(2,:) = [0.87058824300766 0.490196079015732 0];
+            b(2).CData(2,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            b(1).CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(2).CData(3,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            b(1).CData(4,:) = [0.600000023841858 0.200000002980232 0];
+            b(2).CData(4,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            b(1).CData(5,:) = [0.600000023841858 0.200000002980232 0];
+            b(2).CData(5,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            hold on
+
+            M = AvAnnualDeathsUK_SE(1,13)*1.3; %set y axis max limit across sub-plots
+            % Create ylabel
+            ylabel('Average Annual Heat Related Deaths');
+
+            % Create xlabel
+            xlabel('Climate Scenario');
+
+            % Create title
+            title('Climate Change Only');
+
+             labels = {'No Adaptation','Adaptation'};
+             legend(labels);
+             set(legend,...
+                 'Position',[0.157187955560562 0.762734641133266 0.276785708750997 0.13589211247274]);
+
+            % Set the remaining axes properties
+            set (gca, 'ylim', [0 M])
+            set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'Past','1.5','2.0','3.0', '4.0'},'YGrid',...
+                'on');
+
+            subplot(1,2,2);
+            b=bar (AvAnnualDeathsAdapt_SE.', 'stacked', 'FaceColor','flat');     
+
+            b(2).CData(1,:) = [0.87058824300766 0.490196079015732 0];
+            b(1).CData(1,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            b(1).CData(2,:) = [0.87058824300766 0.490196079015732 0];
+            b(2).CData(2,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            b(1).CData(3,:) = [0.850980401039124 0.325490206480026 0.0980392172932625];
+            b(2).CData(3,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            b(1).CData(4,:) = [0.600000023841858 0.200000002980232 0];
+            b(2).CData(4,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            b(1).CData(5,:) = [0.600000023841858 0.200000002980232 0];
+            b(2).CData(5,:) = [0.800000011920929 0.800000011920929 0.800000011920929];
+            hold on
+
+            % Create ylabel
+            ylabel('Average Annual Heat Related Deaths');
+
+            % Create xlabel
+            xlabel('Climate Scenario');
+
+            % Create title
+            title('Climate and Population Change');
+
+            % Set the remaining axes properties
+            set (gca, 'ylim', [0 M])
+            set(gca,'XTick',[1 2 3 4 5],'XTickLabel',{'Past','1.5','2.0','3.0', '4.0'},'YGrid',...
+                'on');
+% 
+%             % adaptation comparison
 %             AvAdaptResultsSE = AvAdaptResultsSE.'; %Transpose for clustered bar
 %             AvAdaptResults_10percentileSE = AvAdaptResults_10percentileSE.';
 %             AvAdaptResults_90percentileSE = AvAdaptResults_90percentileSE.';
 % 
-%             M = max(AvAdaptResults_90percentileSE(5,1)*1.1); %set y axis max limit across sub-plots
+%             M = 22000; %set y axis max limit across sub-plots
 % 
 %             figure
 %             b = bar(AvAdaptResultsSE, 'FaceColor', 'flat');
@@ -1736,8 +2042,8 @@ end
 %             b(4).CData(5,:) = [0.40,0.00,0.00];
 % 
 %             hold on
-%             p_errhigh = AvAdaptResults_90percentileSE - AvAdaptResultsSE; %90th p - average
-%             p_errlow = AvAdaptResultsSE - AvAdaptResults_10percentileSE; % average - 10th p)
+%            % p_errhigh = AvAdaptResults_90percentileSE - AvAdaptResultsSE; %90th p - average
+%            % p_errlow = AvAdaptResultsSE - AvAdaptResults_10percentileSE; % average - 10th p)
 % 
 %             % Calculate the number of groups and number of bars in each group
 %             [ngroups,nbars] = size(AvAdaptResultsSE);
@@ -1747,7 +2053,7 @@ end
 %                 x(i,:) = b(i).XEndPoints;
 %             end
 % 
-%             er = errorbar(x', AvAdaptResultsSE, p_errlow, p_errhigh, 'k', 'LineWidth',1,'linestyle','none');                                
+%             er = errorbar(x', AvAdaptResultsSE,  AvAdaptResults_10percentileSE,  AvAdaptResults_90percentileSE, 'k', 'LineWidth',1,'linestyle','none');                                
 % 
 %             % Create ylabel
 %             ylabel('Average Annual Heat Related Deaths');
@@ -1766,11 +2072,11 @@ end
 %                 'on');
 %             ax = gca;
 %             ax.YAxis.Exponent = 0;
-%    end
+    end
 elseif impactMetric == 2
-    run ARCADIA_HEAT_Impacts_labour_productivity.m
-% elseif impactMetric == 3
-%     run ARCADIA_HEAT_Impacts_TMAX_mortality_test.m
+    run HARM_labour_productivity.m
+elseif impactMetric == 3
+     run HARM_residential_discomfort.m
 end
 
 toc  %stopwatch to measure performance
