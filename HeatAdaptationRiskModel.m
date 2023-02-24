@@ -111,25 +111,34 @@ nClimScen = 0; %number of climate scenarios - based on input data.
 % User defined parameters - CHANGE HERE %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 BiasCorrected = 1; %TRUE = 1, FALSE = 0 %%USER DEFINED AT THIS STAGE IN FUTURE ALWAYS USE BIAS CORRECTED??
-impactMetric = 1; %Select impact to run - 1 = mortality; 2 = labour productivity; 3 = residential discomfort.
-ClimateScenario = 6; %1 = past; 2 = 1.5 degree; 3 = 2.0 degree; 4 = 3.0 degree; 5 = 4.0 degree; 6 = run ALL.
+impactMetric = 2; %Select impact to run - 1 = mortality; 2 = labour productivity; 3 = residential discomfort.
+ClimateScenario = 1; %1 = past; 2 = 1.5 degree; 3 = 2.0 degree; 4 = 3.0 degree; 5 = 4.0 degree; 6 = run ALL.
 populationYearbaseline = 2011;
-populationYear15degree = 2020; % 2020, 2050, 2080; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
-populationYear2degree = 2030; % 2030; 2050; 2080; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
-populationYear3degree = 2050; % 2050; 2080; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
-populationYear4degree = 2100; % NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
-UK_SSP = 5; %data available from UDM for UK-SSPs 2,4 and 5.
+populationYear15degree = 2050; % 2020, 2050, 2080/2100; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
+populationYear2degree = 2050; % 2030; 2050; 2080/2100; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
+populationYear3degree = 2050; % 2050; 2080/2100; population year defines when warming level projected to occur. NOTE for residential dicomfort as data from UDM only use 2050 and 2080.
+populationYear4degree = 2050; % 2050; 2080/2100. NOTE for residential dicomfort as data from UDM only use 2050 and **2080** not 2100.
+UK_SSP = 2; %UK-SSP data available from UDM for UK-SSPs 2,4 and 5 (2050 and 2080 ONLY). Direct from CE UK-SSPs (annual to 2100)
 
 %Mortality Related
 acclimaScen = 1; %Select approach to behavioural adaptation via natural acclimatisation. 1 = No Adaptation; 2 & 3 = pre-defined thresholds 1 and 2 degrees respectively; 4 = 93rd P of TMean (spatially and temporally explicit based on output from HEAT)
 
 % Residential discomfort related
-RDProbabilityLevel = 0.25; % Level at which to define probability of residential thermal discomfort. [See Kingsborough et al: http://dx.doi.org/10.1016/j.crm.2017.01.001. Set values as 0.1, 0.25 and 0.5.
+RDProbabilityLevel = 0.25; % 0.10, 0.25, 0.50. Level at which to define probability of residential thermal discomfort. [See Kingsborough et al: http://dx.doi.org/10.1016/j.crm.2017.01.001. Set values as 0.1, 0.25 and 0.5.
 RDNumberConsecutiveDays = 5; % number of consecutive days of overheating above which overheating is calculated.
-RDAdaptScenario = 2; % 1 = standard whole house retrofit; 2 = option 1 plus external shutters for shading; 3 = air conditioning uptake only.
+deploymentPercent = [0; 14; 14; 44; 60]; %Default values, can be changed by user here. Deployment for 5 time periods (BL, 2020, 2030, 2050, 2080)
+%RDAdaptScenario = 2; % 1 = standard whole house retrofit; 2 = option 1 plus external shutters for shading; 3 = air conditioning uptake only.
 
 %labour productivity related
-acclimatised = 1; % 0 = non-acclimatised; 1= acclimatised. Defines which Exposure response Functions (ERFs) are used.
+%acclimatised = 1; % 1 = non-acclimatised; 2 = acclimatised. Defines which
+%Exposure response Functions (ERFs) are used. Run with both...
+heatMetricProductivity = 1; % DEFAULT is 1 = sWBGT. In future add 2 = WBGT if we can use metric from UK MetOffice.
+%heatMetricWorkCapacity = 1; %DEFAULT is 1 = HUMIDEX and 2 = Heat Index: In future when available... Alternative approach to calculating.
+employmentYearbaseline = 2011;
+employmentYear15degree = 2050; % 2050, 2080; year defines when warming level projected to occur. only use 2050 and 2080.
+employmentYear2degree = 2050; % 050; 2080; year defines when warming level projected to occur. only use 2050 and 2080.
+employmentYear3degree = 2050; % 2050; 2080/2100; year defines when warming level projected to occur. only use 2050 and 2080.
+employmentYear4degree = 2050; % 2050; 2080/2100. use 2050 and 2080
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -145,14 +154,14 @@ elseif acclimaScen == 4
     adaptationName = 'Adapt 93rd Percentile';
 end
 
-% Add something to give files more readable names...Residential discomfort
-if RDAdaptScenario == 1
-    adaptationIntervention = 'Retro';
-elseif RDAdaptScenario == 2
-    adaptationIntervention = 'Retro_shading';
-elseif RDAdaptScenario == 3
-    adaptationIntervention = 'a/c';
-end
+% % Add something to give files more readable names...Residential discomfort
+% if RDAdaptScenario == 1
+%     adaptationIntervention = 'Retro';
+% elseif RDAdaptScenario == 2
+%     adaptationIntervention = 'Retro_shading';
+% elseif RDAdaptScenario == 3
+%     adaptationIntervention = 'a/c';
+% end
 
 %% Select correct SSP dataset. OFFLINE AT
 % MOMENT - IN FUTURE PULL FROM .asc FILES ON DAFNI first then aggregate.
