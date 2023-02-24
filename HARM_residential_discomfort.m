@@ -34,17 +34,16 @@
 %      in and provide latitude and longitude based on coordinate given in file 
 %      names from 7 above. Saved in gridID.
 %
-%   5. deploymentPercent.(5,4)Percentage deployment of various retrofit options
-%       from UCL model. rows = 5 timeperiods (no data for 2020 so
-%       blank) by 4 adaptation interventions column 1 = no adaptation. 2 =
-%       retrofit column 3 = retrofit plus shading column 4 = Air conditioning.
+%   5. deploymentPercent.(5,1). Percentage of total buildings where adaptation
+%     (energy and shading retrofit) is installed. From UCL model. 
+%     rows = 5 timeperiods (BL, 2020, 2030, 2050, 2080).
 %
-%   6. building_threshold_[adaptation]. {4,1}(2205, 11). TMean theresholds above which
+%   6. building_thresholds. {5,1}(2205, 11). TMean theresholds above which
 %      residential discomfort would occur overnight in bedrooms. Based on UCL
-%      model data. For 5 timeperiods (no data for 2020). Columns 1-2 lon and
+%      model data. For 5 timeperiods (no data for 2080/2100 at present). Columns 1-2 lon and
 %      lat, column 3 = GOR, column 4-7 = threholds for 4 building types with
 %      NO adaptation; columns 8-11 = thresholds for 4 building types WITH
-%      adaptation.
+%      adaptation. Adaptation reflects energy retrofit and shading devices.
 %
 %   7. building_numbers. Total buildings per 12km gridcell for 4 building
 %      types: Flats, detached, semi-detached, Terrace from UDM. Assumed
@@ -383,8 +382,8 @@ for i = 1:nGridCells
 end
 gridID = fix(gridID*1e5)/1e5;
 
-lonIDIndex = fix(building_threshold_ac{1}(:,1)*1e5)/1e5; %truncate decimals to allow match to gridID - different order to IDs in gridID
-latIDIndex = fix(building_threshold_ac{1}(:,2)*1e5)/1e5; %truncate decimals to allow match to gridID - different order to IDs in gridID
+lonIDIndex = fix(building_thresholds{1}(:,1)*1e5)/1e5; %truncate decimals to allow match to gridID - different order to IDs in gridID
+latIDIndex = fix(building_thresholds{1}(:,2)*1e5)/1e5; %truncate decimals to allow match to gridID - different order to IDs in gridID
 
 save('gridID', 'gridID', 'lonIDIndex', 'latIDIndex')
 clear cellIndex %not used past this point - use gridID
@@ -406,14 +405,14 @@ nBuilds = 4;  %Flats, detached, semi-detached, Terrace - pre-determined by UDM c
 adaptScenarios = 2; %results run with and without adaptation (based on option selected by user) qunderpinned by UCL data.
 consecutive_days = 0;
 
-%Based on user setup - read in correct .m data
-if RDAdaptScenario == 1 
-    building_thresholds = building_threshold_retrofit; % retrofit standard
-elseif RDAdaptScenario == 2 
-    building_thresholds = building_threshold_retro_shading; % retrofit standard plus shading
-elseif RDAdaptScenario == 3 
-    building_thresholds = building_threshold_ac; % A/C only
-end
+% %Based on user setup - read in correct .m data
+% if RDAdaptScenario == 1 
+%     building_thresholds = building_threshold_retrofit; % retrofit standard
+% elseif RDAdaptScenario == 2 
+%     building_thresholds = building_threshold_retro_shading; % retrofit standard plus shading
+% elseif RDAdaptScenario == 3 
+%     building_thresholds = building_threshold_ac; % A/C only
+% end
 
 % Based on user set up - dependent on the year socio-economic data is selected for, the deployment of adaptation action (uptake) will differ(from UCL)
 if populationYear15degree == 2020 || populationYear2degree == 2020 || populationYear3degree == 2020 || populationYear4degree == 2020
@@ -601,8 +600,10 @@ if (ClimateScenario == 1 || ClimateScenario == 6) %% baseline or all climate sce
          ResultsAnnualFrequencyEvents = ResultsAnnualFrequency(:,:);
          save(fname, 'ResultsAnnualFrequencyEvents', 'ResultsExceedDays_past')
 
+         h=1; % re-set here if ClimateScenario == 6 and code continues...
     else
         disp ('no input data - past')
+
     end
 end
 
@@ -754,9 +755,9 @@ if (ClimateScenario == 2 || ClimateScenario == 6) %% 1.5degree or all climate sc
                             for c = 1:nCols
                                 if ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && ppl_per_event{h}(r,c) == ppl_per_event_adapt{h}(r,c) && ppl_per_event_adapt{h}(r,c)/population{1+p}(h,3) >= RDProbabilityLevel    % RDProbabilityLevel set by user.
                                     ppl_per_event_thres{h}(r,c) = 1; % adaptation has not mitigated ANY risk.
-                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) == 0 && (ppl_per_event{h}(r,c)*(1-deploymentPercent(deploymentYear,RDAdaptScenario)/100))/population{1+p}(h,3) >= RDProbabilityLevel % where adaptation has mitigated event across all building types
+                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) == 0 && (ppl_per_event{h}(r,c)*(1-deploymentPercent(deploymentYear,1)/100))/population{1+p}(h,3) >= RDProbabilityLevel % where adaptation has mitigated event across all building types
                                     ppl_per_event_thres{h}(r,c) = 1; % adaptation mitigated ALL risk but 100% of houses are not adapted - calculates residual risk.
-                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && (ppl_per_event{h}(r,c)*(1-((ppl_per_event_adapt{h}(r,c)/ppl_per_event{h}(r,c))/(100*deploymentPercent(deploymentYear,RDAdaptScenario)))))/population{1+p}(h,3) >= RDProbabilityLevel
+                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && (ppl_per_event{h}(r,c)*(1-((ppl_per_event_adapt{h}(r,c)/ppl_per_event{h}(r,c))/(100*deploymentPercent(deploymentYear,1)))))/population{1+p}(h,3) >= RDProbabilityLevel
                                     ppl_per_event_thres{h}(r,c) = 1; % where adaptation has mitigated event across ONLY SOME building types BUT NOT ALL so proportional
                                 end       
                             end
@@ -807,13 +808,13 @@ if (ClimateScenario == 2 || ClimateScenario == 6) %% 1.5degree or all climate sc
 
      % Files to SAVE
             if l==1 %climate change only (with and without adaptation)
-            fname = sprintf('RD_Results_1_5C_%s_%0.2f_%d_%0.2f_%s.mat', '_CCOnly', RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,RDAdaptScenario), adaptationIntervention);
+            fname = sprintf('RD_Results_1_5C_%s_%0.2f_%d_%0.2f.mat', '_CCOnly', RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,1));
             ResultsAnnualFrequencyEvents_1_5_CC = ResultsAnnualFrequency;
             ResultsExceedDays_1_5_CC = ResultsExceedDays; % reflects exceedance of TMean and role of adaptation on changing thrsholds. SE change has no effect here.
             save(fname, 'ResultsAnnualFrequencyEvents_1_5_CC', 'ResultsExceedDays_1_5_CC')
             
             elseif l==2 %Climate change and population change (with and without adaptation)
-            fname = sprintf('RD_Results_1_5C_%s_%s_%d_SSP%d_%0.2f__%d_%0.2f_%s.mat', '_SE', 'Adapt', populationYear15degree, UK_SSP, RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,RDAdaptScenario), adaptationIntervention);
+            fname = sprintf('RD_Results_1_5C_%s_%s_%d_SSP%d_%0.2f_%d_%0.2f.mat', '_SE', 'Adapt', populationYear15degree, UK_SSP, RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,1));
             ResultsAnnualFrequencyEvents_1_5_SE = ResultsAnnualFrequency; %ResultsExceedDays doesn't change with SE scenario.
             save(fname, 'ResultsAnnualFrequencyEvents_1_5_SE')
             end
@@ -828,6 +829,7 @@ if (ClimateScenario == 2 || ClimateScenario == 6) %% 1.5degree or all climate sc
                 p=4;
             end
         end
+        h=1; % re-set here if ClimateScenario == 6 and code continues...
     else
         disp ('no input data - 1.5C')
     end
@@ -980,9 +982,9 @@ if (ClimateScenario == 3 || ClimateScenario == 6) %% 2degree or all climate scen
                             for c = 1:nCols
                                 if ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && ppl_per_event{h}(r,c) == ppl_per_event_adapt{h}(r,c) && ppl_per_event_adapt{h}(r,c)/population{1+p}(h,3) >= RDProbabilityLevel    % RDProbabilityLevel set by user.
                                     ppl_per_event_thres{h}(r,c) = 1; % adaptation has not mitigated ANY risk.
-                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) == 0 && (ppl_per_event{h}(r,c)*(1-deploymentPercent(deploymentYear,RDAdaptScenario)/100))/population{1+p}(h,3) >= RDProbabilityLevel % where adaptation has mitigated event across all building types
+                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) == 0 && (ppl_per_event{h}(r,c)*(1-deploymentPercent(deploymentYear,1)/100))/population{1+p}(h,3) >= RDProbabilityLevel % where adaptation has mitigated event across all building types
                                     ppl_per_event_thres{h}(r,c) = 1; % adaptation mitigated ALL risk but 100% of houses are not adapted - calculates residual risk.
-                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && (ppl_per_event{h}(r,c)*(1-((ppl_per_event_adapt{h}(r,c)/ppl_per_event{h}(r,c))/(100*deploymentPercent(deploymentYear,RDAdaptScenario)))))/population{1+p}(h,3) >= RDProbabilityLevel
+                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && (ppl_per_event{h}(r,c)*(1-((ppl_per_event_adapt{h}(r,c)/ppl_per_event{h}(r,c))/(100*deploymentPercent(deploymentYear,1)))))/population{1+p}(h,3) >= RDProbabilityLevel
                                     ppl_per_event_thres{h}(r,c) = 1; % where adaptation has mitigated event across ONLY SOME building types BUT NOT ALL so proportional
                                 end           
                             end
@@ -1033,13 +1035,13 @@ if (ClimateScenario == 3 || ClimateScenario == 6) %% 2degree or all climate scen
 
      % Files to SAVE
             if l==1 %climate change only (with and without adaptation)
-            fname = sprintf('RD_Results_2_0C_%s_%0.2f_%d_%0.2f_%s.mat', '_CCOnly', RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,RDAdaptScenario), adaptationIntervention);
+            fname = sprintf('RD_Results_2_0C_%s_%0.2f_%d_%0.2f.mat', '_CCOnly', RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,1));
             ResultsAnnualFrequencyEvents_2_0_CC = ResultsAnnualFrequency;
             ResultsExceedDays_2_0_CC = ResultsExceedDays; % reflects exceedance of TMean and role of adaptation on changing thrsholds. SE change has no effect here.
             save(fname, 'ResultsAnnualFrequencyEvents_2_0_CC', 'ResultsExceedDays_2_0_CC')
             
             elseif l==2 %Climate change and population change (with and without adaptation)
-            fname = sprintf('RD_Results_2_0C_%s_%s_%d_SSP%d_%0.2f__%d_%0.2f_%s.mat', '_SE', 'Adapt', populationYear2degree, UK_SSP, RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,RDAdaptScenario), adaptationIntervention);
+            fname = sprintf('RD_Results_2_0C_%s_%s_%d_SSP%d_%0.2f__%d_%0.2f.mat', '_SE', 'Adapt', populationYear2degree, UK_SSP, RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,1));
             ResultsAnnualFrequencyEvents_2_0_SE = ResultsAnnualFrequency;
             save(fname, 'ResultsAnnualFrequencyEvents_2_0_SE')
             end
@@ -1054,6 +1056,7 @@ if (ClimateScenario == 3 || ClimateScenario == 6) %% 2degree or all climate scen
                 p=4;
             end
         end
+        h=1; % re-set here if ClimateScenario == 6 and code continues...
     else
         disp ('no input data - 2.0C')
     end
@@ -1205,9 +1208,9 @@ if (ClimateScenario == 4 || ClimateScenario == 6) %% 3degree or all climate scen
                             for c = 1:nCols
                                 if ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && ppl_per_event{h}(r,c) == ppl_per_event_adapt{h}(r,c) && ppl_per_event_adapt{h}(r,c)/population{1+p}(h,3) >= RDProbabilityLevel    % RDProbabilityLevel set by user.
                                     ppl_per_event_thres{h}(r,c) = 1; % adaptation has not mitigated ANY risk.
-                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) == 0 && (ppl_per_event{h}(r,c)*(1-deploymentPercent(deploymentYear,RDAdaptScenario)/100))/population{1+p}(h,3) >= RDProbabilityLevel % where adaptation has mitigated event across all building types
+                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) == 0 && (ppl_per_event{h}(r,c)*(1-deploymentPercent(deploymentYear,1)/100))/population{1+p}(h,3) >= RDProbabilityLevel % where adaptation has mitigated event across all building types
                                     ppl_per_event_thres{h}(r,c) = 1; % adaptation mitigated ALL risk but 100% of houses are not adapted - calculates residual risk.
-                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && (ppl_per_event{h}(r,c)*(1-((ppl_per_event_adapt{h}(r,c)/ppl_per_event{h}(r,c))/(100*deploymentPercent(deploymentYear,RDAdaptScenario)))))/population{1+p}(h,3) >= RDProbabilityLevel
+                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && (ppl_per_event{h}(r,c)*(1-((ppl_per_event_adapt{h}(r,c)/ppl_per_event{h}(r,c))/(100*deploymentPercent(deploymentYear,1)))))/population{1+p}(h,3) >= RDProbabilityLevel
                                     ppl_per_event_thres{h}(r,c) = 1; % where adaptation has mitigated event across ONLY SOME building types BUT NOT ALL so proportional
                                 end       
                             end
@@ -1258,13 +1261,13 @@ if (ClimateScenario == 4 || ClimateScenario == 6) %% 3degree or all climate scen
 
      % Files to SAVE
             if l==1 %climate change only (with and without adaptation)
-            fname = sprintf('RD_Results_3_0C_%s_%0.2f_%d_%0.2f_%s.mat', '_CCOnly', RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,RDAdaptScenario), adaptationIntervention);
+            fname = sprintf('RD_Results_3_0C_%s_%0.2f_%d_%0.2f.mat', '_CCOnly', RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,1));
             ResultsAnnualFrequencyEvents_3_0_CC = ResultsAnnualFrequency;
             ResultsExceedDays_3_0_CC = ResultsExceedDays; % reflects exceedance of TMean and role of adaptation on changing thrsholds. SE change has no effect here.
             save(fname, 'ResultsAnnualFrequencyEvents_3_0_CC', 'ResultsExceedDays_3_0_CC')
             
             elseif l==2 %Climate change and population change (with and without adaptation)
-            fname = sprintf('RD_Results_3_0C_%s_%s_%d_SSP%d_%0.2f__%d_%0.2f_%s.mat', '_SE', 'Adapt', populationYear3degree, UK_SSP, RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,RDAdaptScenario), adaptationIntervention);
+            fname = sprintf('RD_Results_3_0C_%s_%s_%d_SSP%d_%0.2f__%d_%0.2f.mat', '_SE', 'Adapt', populationYear3degree, UK_SSP, RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,1));
             ResultsAnnualFrequencyEvents_3_0_SE = ResultsAnnualFrequency;
             save(fname, 'ResultsAnnualFrequencyEvents_3_0_SE')
             end
@@ -1279,7 +1282,7 @@ if (ClimateScenario == 4 || ClimateScenario == 6) %% 3degree or all climate scen
                 p=4;
             end
         end
-
+        h=1; % re-set here if ClimateScenario == 6 and code continues...
     else
         disp ('no input data - 3.0C')
     end
@@ -1433,9 +1436,9 @@ if (ClimateScenario == 5 || ClimateScenario == 6) %% 4degree or all climate scen
                             for c = 1:nCols
                                 if ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && ppl_per_event{h}(r,c) == ppl_per_event_adapt{h}(r,c) && ppl_per_event_adapt{h}(r,c)/population{1+p}(h,3) >= RDProbabilityLevel    % RDProbabilityLevel set by user.
                                     ppl_per_event_thres{h}(r,c) = 1; % adaptation has not mitigated ANY risk.
-                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) == 0 && (ppl_per_event{h}(r,c)*(1-deploymentPercent(deploymentYear,RDAdaptScenario)/100))/population{1+p}(h,3) >= RDProbabilityLevel % where adaptation has mitigated event across all building types
+                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) == 0 && (ppl_per_event{h}(r,c)*(1-deploymentPercent(deploymentYear,1)/100))/population{1+p}(h,3) >= RDProbabilityLevel % where adaptation has mitigated event across all building types
                                     ppl_per_event_thres{h}(r,c) = 1; % adaptation mitigated ALL risk but 100% of houses are not adapted - calculates residual risk.
-                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && (ppl_per_event{h}(r,c)*(1-((ppl_per_event_adapt{h}(r,c)/ppl_per_event{h}(r,c))/(100*deploymentPercent(deploymentYear,RDAdaptScenario)))))/population{1+p}(h,3) >= RDProbabilityLevel
+                                elseif ppl_per_event{h}(r,c) > 0 && ppl_per_event_adapt{h}(r,c) > 0 && (ppl_per_event{h}(r,c)*(1-((ppl_per_event_adapt{h}(r,c)/ppl_per_event{h}(r,c))/(100*deploymentPercent(deploymentYear,1)))))/population{1+p}(h,3) >= RDProbabilityLevel
                                     ppl_per_event_thres{h}(r,c) = 1; % where adaptation has mitigated event across ONLY SOME building types BUT NOT ALL so proportional
                                 end       
                             end
@@ -1487,13 +1490,13 @@ if (ClimateScenario == 5 || ClimateScenario == 6) %% 4degree or all climate scen
 
      % Files to SAVE
             if l==1 %climate change only (with and without adaptation)
-            fname = sprintf('RD_Results_4_0C_%s_%0.2f_%d_%0.2f_%s.mat', '_CCOnly', RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,RDAdaptScenario), adaptationIntervention);
+            fname = sprintf('RD_Results_4_0C_%s_%0.2f_%d_%0.2f.mat', '_CCOnly', RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,1));
             ResultsAnnualFrequencyEvents_4_0_CC = ResultsAnnualFrequency;
             ResultsExceedDays_4_0_CC = ResultsExceedDays; % reflects exceedance of TMean and role of adaptation on changing thrsholds. SE change has no effect here.
             save(fname, 'ResultsAnnualFrequencyEvents_4_0_CC', 'ResultsExceedDays_4_0_CC')
             
             elseif l==2 %Climate change and population change (with and without adaptation)
-            fname = sprintf('RD_Results_4_0C_%s_%s_%d_SSP%d_%0.2f__%d_%0.2f_%s.mat', '_SE', 'Adapt', populationYear4degree, UK_SSP, RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,RDAdaptScenario), adaptationIntervention);
+            fname = sprintf('RD_Results_4_0C_%s_%s_%d_SSP%d_%0.2f__%d_%0.2f.mat', '_SE', 'Adapt', populationYear4degree, UK_SSP, RDProbabilityLevel, RDNumberConsecutiveDays, deploymentPercent(deploymentYear,1));
             ResultsAnnualFrequencyEvents_4_0_SE = ResultsAnnualFrequency;
             save(fname, 'ResultsAnnualFrequencyEvents_4_0_SE')
             end
@@ -1508,6 +1511,7 @@ if (ClimateScenario == 5 || ClimateScenario == 6) %% 4degree or all climate scen
                 p=4;
             end
         end
+        h=1; % re-set here if ClimateScenario == 6 and code continues...
     else
         disp ('no input data - 4.0C')
     end
