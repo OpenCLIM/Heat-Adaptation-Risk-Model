@@ -8,6 +8,7 @@
 %   data from UDM (Craig Robson, NCL); and residential building overheating 
 %   data from UCL (Lauren Ferguson and Anna Mavrogianni, UCL)
 %   
+%   27/03/2023
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -404,15 +405,6 @@ ResultsAnnualFrequency = zeros(nGridCells,6); %not cell for BL as no adaptation/
 nBuilds = 4;  %Flats, detached, semi-detached, Terrace - pre-determined by UDM categories.
 adaptScenarios = 2; %results run with and without adaptation (based on option selected by user) qunderpinned by UCL data.
 consecutive_days = 0;
-
-% %Based on user setup - read in correct .m data
-% if RDAdaptScenario == 1 
-%     building_thresholds = building_threshold_retrofit; % retrofit standard
-% elseif RDAdaptScenario == 2 
-%     building_thresholds = building_threshold_retro_shading; % retrofit standard plus shading
-% elseif RDAdaptScenario == 3 
-%     building_thresholds = building_threshold_ac; % A/C only
-% end
 
 % Based on user set up - dependent on the year socio-economic data is selected for, the deployment of adaptation action (uptake) will differ(from UCL)
 if populationYear15degree == 2020 || populationYear2degree == 2020 || populationYear3degree == 2020 || populationYear4degree == 2020
