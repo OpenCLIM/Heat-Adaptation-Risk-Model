@@ -1,0 +1,121 @@
+api_version: v1beta2
+kind: M
+metadata: 
+  description: "The Heat Adaptation Risk Model (HARM) has been created for the OpenCLIM project, based upon the ARCADIA impacts model. \n"
+  display_name: HARM
+  name: harm
+  publisher: "University of East Anglia"
+  source_code: "https://github.com/OpenCLIM/Heat-Adaptation-Risk-Model"
+  summary: "OpenCLIM Heat Adaptation Risk Model (HARM)"
+spec: 
+  inputs: 
+    parameters:
+      - 
+        name: IMPMET
+        title: Impact Metric
+        description: Choose to model hot or cold related mortality
+        type: string
+        options: 
+          - name: HeatMort
+            title: Heat related mortality
+          - name: ColdMort
+            title: Cold related mortality
+        default: HeatMort
+        required: true
+      - 
+        name: VARNAME
+        title: Variable name
+        description: The name of the climate variable in the netCDF if not 'tas'
+        type: string
+        required: false 
+      - 
+        name: SOCIOECON
+        title: Socioeconomics
+        description: Choose to analyse climate change only or climate + socioeconomic change
+        type: string
+        options: 
+          - name: CConly
+            title: Climate change only
+          - name: SSP2-2050
+            title: UK-SSP2 2050
+          - name: SSP2-2080
+            title: UK-SSP2 2080
+          - name: SSP4-2050
+            title: UK-SSP4 2050
+          - name: SSP4-2080
+            title: UK-SSP4 2080
+          - name: SSP5-2050
+            title: UK-SSP5 2050
+          - name: SSP5-2080
+            title: UK-SSP5 2080
+          - name: UDM
+            title: Population from UDM scenario
+          - name: Other
+            title: Other user uploaded scenario (population.csv and deathrate.csv)
+        default: CConly
+        required: true 
+      -
+        name: ACCLIMSCEN
+        title: Acclimatisation parameterisation (for mortality)
+        description: Choose acclimatisation parameterisation (for mortality only)
+        type: string
+        options: 
+          - name: None
+            title: No acclimatisation
+          - name: 93rdMMT
+            title: Variable acclimatisation to MMT (regional percentile shift from HEAT)
+          - name: 93rdMMTRR
+            title: Variable acclimatisation to MMT and RR (regional percentile shift from HEAT)
+          - name: Custom
+            title: Uniform acclimatisation of MMT and RR (provide UK-wide value below)
+        default: None
+        required: false 
+      -
+        name: MMT
+        title: Custom MMT
+        description: Choose a uniform amount to adjust the MMT by in all regions
+        type: number
+        min: -20
+        max: 20
+        default: 0
+        required: false 
+      -
+        name: RR
+        title: Custom RR
+        description: Choose a uniform amount to adjust the RR by in all regions
+        type: number
+        min: -20
+        max: 20
+        default: 0
+        required: false
+
+    dataslots: 
+      - 
+        description: "A dataslot that should contain some climate netCDFs"
+        name: Climate
+        path: inputs/Climate/
+        required: false
+      -
+        default:
+          - 322275ac-73ba-4f21-ab14-b5547dffbbb5
+        description: "A dataslot for the required pre-processed HARM data"
+        name: PreProcessedData
+        path: inputs/PreProcessedData/
+        required: true
+      -
+        description: "An optional dataslot to include building information from UDM"
+        name: Urban
+        path: inputs/UrbanData/
+        required: false
+      -
+        description: "An optional dataslot to include alternative MMT and RR fields"
+        name: Mortality
+        path: inputs/Mortality/
+        required: false
+      -
+        description: "An optional dataslot to include alternative population and daily death rate fields"
+        name: Population
+        path: inputs/Population/
+        required: false
+
+
